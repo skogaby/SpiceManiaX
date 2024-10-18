@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
 #include <thread>
 #include <Windows.h>
 #include <setupapi.h>
@@ -36,6 +40,7 @@ public:
     void SMX_SetLogCallback(SMXLogCallback callback);
     uint16_t SMX_GetInputState(int pad);
     void SMX_Start(SMXUpdateCallback UpdateCallback, void *pUser);
+    void SMX_Stop();
     void SMX_SetLights2(const char *lightData, int lightDataSize);
     void SMX_SetDedicatedCabinetLights(SMXDedicatedCabinetLights lightDevice, const char* lightData, int lightDataSize);
 

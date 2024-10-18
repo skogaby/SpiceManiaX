@@ -8,6 +8,21 @@
     <Filter Include="Source Files\smx">
       <UniqueIdentifier>{81cf5272-690d-448d-827e-f23d64e3c565}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\rapidjson">
+      <UniqueIdentifier>{2c20917e-ab38-4506-aae6-f99cfff6fcb7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\rapidjson\error">
+      <UniqueIdentifier>{19029fd9-0da8-40cf-86a0-be492055ebe5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\rapidjson\internal">
+      <UniqueIdentifier>{60c2d623-e1af-4d1a-9b4e-766126b7505e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\rapidjson\msinttypes">
+      <UniqueIdentifier>{cf4c659a-6cff-4592-b5d2-4a8c61b38001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\spiceapi">
+      <UniqueIdentifier>{1dd9aa9a-678d-4bd2-9d44-fc2429983a92}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SpiceManiaX.cpp">
@@ -16,10 +31,133 @@
     <ClCompile Include="smx\smx.cpp">
       <Filter>Source Files\smx</Filter>
     </ClCompile>
+    <ClCompile Include="spiceapi\connection.cpp">
+      <Filter>Source Files\spiceapi</Filter>
+    </ClCompile>
+    <ClCompile Include="spiceapi\rc4.cpp">
+      <Filter>Source Files\spiceapi</Filter>
+    </ClCompile>
+    <ClCompile Include="spiceapi\wrappers.cpp">
+      <Filter>Source Files\spiceapi</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="smx\smx.h">
       <Filter>Source Files\smx</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\allocators.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\document.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\encodedstream.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\encodings.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\filereadstream.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\filewritestream.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\fwd.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\istreamwrapper.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\memorybuffer.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\memorystream.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\ostreamwrapper.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\pointer.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\prettywriter.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\rapidjson.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\reader.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\schema.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\stream.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\stringbuffer.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\writer.h">
+      <Filter>Source Files\rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\error\en.h">
+      <Filter>Source Files\rapidjson\error</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\error\error.h">
+      <Filter>Source Files\rapidjson\error</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\biginteger.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\diyfp.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\dtoa.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\ieee754.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\itoa.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\meta.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\pow10.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\regex.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\stack.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\strfunc.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\strtod.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\swap.h">
+      <Filter>Source Files\rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\msinttypes\inttypes.h">
+      <Filter>Source Files\rapidjson\msinttypes</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\msinttypes\stdint.h">
+      <Filter>Source Files\rapidjson\msinttypes</Filter>
+    </ClInclude>
+    <ClInclude Include="spiceapi\connection.h">
+      <Filter>Source Files\spiceapi</Filter>
+    </ClInclude>
+    <ClInclude Include="spiceapi\rc4.h">
+      <Filter>Source Files\spiceapi</Filter>
+    </ClInclude>
+    <ClInclude Include="spiceapi\wrappers.h">
+      <Filter>Source Files\spiceapi</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,10 +1,15 @@
+#include "spiceapi/connection.h"
+#include "spiceapi/wrappers.h"
 #include "smx/smx.h"
 #include <iostream>
-#include <Windows.h>
+
+#pragma comment(lib, "Ws2_32.lib")
+
+using namespace spiceapi;
 
 // Logging callback for the StepManiaX SDK
 static void smxLogCallback(const char* log) {
-    printf("[SMX] -> %s\n", log);
+    printf("[stepmaniax-sdk] -> %s\n", log);
 }
 
 // The callback that's invoked by the StepManiaX SDK whenver the state changes on either
@@ -26,9 +31,31 @@ int main() {
 
     printf("Loaded SMX.dll successfully, attempting to connect to SpiceAPI now\n");
 
-    while (1) {
+    // TODO: Remove hardcoded credentials, port, etc.
+    // Connect to SpiceAPI
+    Connection con("localhost", 1337, "lol");
 
+    if (!con.check()) {
+        printf("Unable to connect to SpiceAPI, exiting\n");
+        SMXWrapper::getInstance().SMX_Stop();
+
+        return -1;
     }
 
+    printf("Connected to SpiceAPI successfully\n");
+
+    while (1) {
+        printf("Getting lights\n");
+        std::vector<LightState> lights;
+        lights_read(con, lights);
+
+        for (const LightState& l : lights) {
+            printf("%s: %f\n", l.name.c_str(), l.value);
+        }
+
+        Sleep(100);
+    }
+
+    SMXWrapper::getInstance().SMX_Stop();
     return 0;
 }
