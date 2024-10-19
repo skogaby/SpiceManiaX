@@ -31,13 +31,21 @@ static void smxStateChangedCallback(int pad, SMXUpdateCallbackReason reason, voi
     printf("\n");*/
 }
 
-// Get the current system time in milliseconds
+// Get the current system time in microseconds
 static ULONGLONG getCurrentTimeMicros() {
     GetSystemTimeAsFileTime(&fileTime);
-    return ((static_cast<ULONGLONG>(fileTime.dwHighDateTime) << 32) | fileTime.dwLowDateTime) / 1L;
+    return ((static_cast<ULONGLONG>(fileTime.dwHighDateTime) << 32) | fileTime.dwLowDateTime) / 1000L;
 }
 
 int main() {
+    // Set the thread priority to the highest, so we maintain timing
+    HANDLE hThread = GetCurrentThread();
+
+    if (SetThreadPriority(hThread, THREAD_PRIORITY_HIGHEST) == 0) {
+        std::cerr << "Failed to set thread priority: " << GetLastError() << std::endl;
+        return 1;
+    }
+
     // First, go ahead and start up the StepManiaX SDK, which should connect to devices
     // as they become available automatically
     smx_sdk.SMX_SetLogCallback(smxLogCallback);
@@ -68,13 +76,16 @@ int main() {
     ULONGLONG last_lights_update = getCurrentTimeMicros();
     int lights_updates = 0;
     int input_updates = 0;
-    int loops = 0;
+    int max_input_updates = 0;
+    int min_input_updates = 100000000;
 
     do {
         ULONGLONG current_time = getCurrentTimeMicros();
 
-        // Attempt to update the lights every 166 microseconds (~60Hz)
-        if (current_time - last_lights_update >= 166000) {
+        // Attempt to update the lights every 161 microseconds. This consistently works out to 58Hz. If we wait for
+        // only 160 microseconds, this is consistently 62Hz, and I'd rather be slightly under than slightly over
+        // since the SDK seems to imply we shouldn't send more than 60 lights updates per seconds to the SMX hardware.
+        if (current_time - last_lights_update >= 161) {
             // First, read the regular light states. We mainly just need this for the subwoofer
             // corner lights and the stage corner lights, since the rest of the lights we care
             // about come from the tape LEDs
@@ -108,8 +119,13 @@ int main() {
         }
 
         // Attempt to update the inputs at 1000Hz. This number gets us pretty consistently
-        // at 999-1001Hz, but Windows scheduling ain't perfect.
-        if (current_time - last_input_update >= 8000) {
+        // at 1000-10005Hz, but Windows scheduling ain't perfect. The resolution of the system
+        // time isn't actually high enough that this happens every 5 microseconds, but if we go
+        // higher than 5, we start to see instances of only hitting like 990Hz of input rate.
+        // This sometimes goes slightly over 1000Hz, but that's not inherently a bad thing since
+        // we're just sending Spice API calls here, and the updates from the SMX pads are happening
+        // asynchronously anyway.
+        if (current_time - last_input_update >= 5) {
             // We should already have the pad states in memory due to the SMX callbacks
             // being called from the SMX thread. Therefore, just send them out via SpiceAPI
 
@@ -117,16 +133,22 @@ int main() {
             input_updates++;
         }
 
-        // Output the current input and output rates once a second
-        if (current_time - last_log_time >= 10000000L) {
-            printf("Loops: %i - Lights updates: %i - Input updates: %i\n", loops, lights_updates, input_updates);
+        // Output the current input and output rates once every 5 seconds
+        if (current_time - last_log_time >= 50000L) {
+            if (input_updates > max_input_updates) {
+                max_input_updates = input_updates;
+            }
+
+            if (input_updates < min_input_updates) {
+                min_input_updates = input_updates;
+            }
+
+            printf("Max: %i - Min: %i - Lights: %i - Input: %i\n",
+                max_input_updates / 5, min_input_updates / 5, lights_updates / 5, input_updates / 5);
             last_log_time = current_time;
             lights_updates = 0;
             input_updates = 0;
-            loops = 0;
         }
-
-        loops++;
     } while (!(lights.empty() && lights_updates > 0));
 
     printf("Lost connection to SpiceAPI, exiting\n");
