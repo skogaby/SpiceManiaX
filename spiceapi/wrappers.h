@@ -22,6 +22,11 @@ namespace spiceapi {
         float value;
     };
 
+    struct TapeLedLightState {
+        std::string name;
+        std::vector<uint8_t> values;
+    };
+
     struct InfoAvs {
         std::string model, dest, spec, rev, ext;
     };
@@ -72,6 +77,8 @@ namespace spiceapi {
     bool control_session_refresh(Connection &con);
     bool control_shutdown(Connection &con);
     bool control_reboot(Connection &con);
+
+    bool ddr_tapeled_get(Connection& con, std::vector<TapeLedLightState>& states);
 
     bool iidx_ticker_set(Connection &con, const char *ticker);
     bool iidx_ticker_reset(Connection &con);

@@ -6,27 +6,27 @@ static HINSTANCE LIBSMX_INSTANCE = nullptr;
 static string LIBSMX_NAME = "SMX.dll";
 
 // SMX_Start API
-typedef void (__stdcall* SMX_Start_t)(SMXUpdateCallback UpdateCallback, void *pUser);
+typedef void (*SMX_Start_t)(SMXUpdateCallback UpdateCallback, void *pUser);
 static SMX_Start_t pSMX_Start = nullptr;
 
 // SMX_Stop API
-typedef void(__stdcall* SMX_Stop_t)();
+typedef void (*SMX_Stop_t)();
 static SMX_Stop_t pSMX_Stop = nullptr;
 
 // SMX_SetLogCallback API
-typedef void(__stdcall* SMX_SetLogCallback_t)(SMXLogCallback callback);
+typedef void (*SMX_SetLogCallback_t)(SMXLogCallback callback);
 static SMX_SetLogCallback_t pSMX_SetLogCallback = nullptr;
 
 // SMX_GetInputState API
-typedef uint16_t(__stdcall* SMX_GetInputState_t)(int pad);
+typedef uint16_t (*SMX_GetInputState_t)(int pad);
 static SMX_GetInputState_t pSMX_GetInputState = nullptr;
 
 // SMX_SetLights2 API
-typedef void (__stdcall* SMX_SetLights2_t)(const char *lightData, int lightDataSize);
+typedef void (*SMX_SetLights2_t)(const char *lightData, int lightDataSize);
 static SMX_SetLights2_t pSMX_SetLights2 = nullptr;
 
 // SMX_SetDedicatedCabinetLights API
-typedef void (__stdcall* SMX_SetDedicatedCabinetLights_t)(
+typedef void (*SMX_SetDedicatedCabinetLights_t)(
     SMXDedicatedCabinetLights lightDevice, const char* lightData, int lightDataSize
 );
 static SMX_SetDedicatedCabinetLights_t pSMX_SetDedicatedCabinetLights = nullptr;

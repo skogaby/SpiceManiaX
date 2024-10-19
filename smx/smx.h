@@ -32,10 +32,7 @@ typedef void SMXLogCallback(const char* log);
  */
 class SMXWrapper {
 public:
-    static SMXWrapper& getInstance() {
-        static SMXWrapper instance;
-        return instance;
-    }
+    SMXWrapper();
     ~SMXWrapper();
     void SMX_SetLogCallback(SMXLogCallback callback);
     uint16_t SMX_GetInputState(int pad);
@@ -43,8 +40,5 @@ public:
     void SMX_Stop();
     void SMX_SetLights2(const char *lightData, int lightDataSize);
     void SMX_SetDedicatedCabinetLights(SMXDedicatedCabinetLights lightDevice, const char* lightData, int lightDataSize);
-
     bool loaded = false;
-private:
-    SMXWrapper();
 };
