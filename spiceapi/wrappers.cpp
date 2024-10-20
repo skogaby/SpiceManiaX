@@ -455,23 +455,20 @@ bool spiceapi::keypads_get(spiceapi::Connection &con, unsigned int keypad, std::
     return true;
 }
 
-bool spiceapi::lights_read(spiceapi::Connection &con, std::vector<spiceapi::LightState> &states) {
+bool spiceapi::lights_read(Connection& con, std::map<std::string, float>& states) {
     auto req = request_gen("lights", "read");
     auto res = response_get(con.request(doc2str(req)));
     if (!res)
         return false;
     auto &data = (*res)["data"];
     for (auto &val : data.GetArray()) {
-        LightState state;
-        state.name = val[0].GetString();
-        state.value = val[1].GetFloat();
-        states.push_back(state);
+        states[val[0].GetString()] = val[1].GetFloat();
     }
     delete res;
     return true;
 }
 
-bool spiceapi::ddr_tapeled_get(Connection& con, std::vector<TapeLedLightState>& states) {
+bool spiceapi::ddr_tapeled_get(Connection& con, std::map<std::string, std::vector<uint8_t>>& states) {
     static const char* device_names[11] = {
             "p1_foot_up",
             "p1_foot_right",
@@ -495,14 +492,14 @@ bool spiceapi::ddr_tapeled_get(Connection& con, std::vector<TapeLedLightState>& 
     auto& data = (*res)["data"].GetArray()[0];
 
     for (size_t device = 0; device < 11; device++) {
-        TapeLedLightState state;
-        state.name = device_names[device];
+        std::string name = std::string(device_names[device]);
+        std::vector<uint8_t> values;
 
-        for (auto& arg : data[device_names[device]].GetArray()) {
-            state.values.push_back(arg.GetUint());
+        for (auto& arg : data[name.c_str()].GetArray()) {
+            values.push_back(arg.GetUint());
         }
 
-        states.push_back(state);
+        states[name] = values;
     }
 
     delete res;

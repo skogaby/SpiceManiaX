@@ -2,6 +2,7 @@
 #define SPICEAPI_WRAPPERS_H
 
 #include <vector>
+#include <map>
 #include <string>
 #include "connection.h"
 
@@ -78,7 +79,7 @@ namespace spiceapi {
     bool control_shutdown(Connection &con);
     bool control_reboot(Connection &con);
 
-    bool ddr_tapeled_get(Connection& con, std::vector<TapeLedLightState>& states);
+    bool ddr_tapeled_get(Connection& con, std::map<std::string, std::vector<uint8_t>>& states);
 
     bool iidx_ticker_set(Connection &con, const char *ticker);
     bool iidx_ticker_reset(Connection &con);
@@ -91,7 +92,7 @@ namespace spiceapi {
     bool keypads_set(Connection &con, unsigned int keypad, std::vector<char> &keys);
     bool keypads_get(Connection &con, unsigned int keypad, std::vector<char> &keys);
 
-    bool lights_read(Connection &con, std::vector<LightState> &states);
+    bool lights_read(Connection &con, std::map<std::string, float>& states);
     bool lights_write(Connection &con, std::vector<LightState> &states);
     bool lights_write_reset(Connection &con, std::vector<LightState> &states);
 

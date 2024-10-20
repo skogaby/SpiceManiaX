@@ -129,13 +129,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="smx\smx.cpp" />
+    <ClCompile Include="smx\smx_wrapper.cpp" />
     <ClCompile Include="spiceapi\connection.cpp" />
     <ClCompile Include="spiceapi\rc4.cpp" />
     <ClCompile Include="spiceapi\wrappers.cpp" />
     <ClCompile Include="SpiceManiaX.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="input_utils.h" />
+    <ClInclude Include="lights_utils.h" />
     <ClInclude Include="rapidjson\allocators.h" />
     <ClInclude Include="rapidjson\document.h" />
     <ClInclude Include="rapidjson\encodedstream.h" />
@@ -171,7 +173,7 @@
     <ClInclude Include="rapidjson\stream.h" />
     <ClInclude Include="rapidjson\stringbuffer.h" />
     <ClInclude Include="rapidjson\writer.h" />
-    <ClInclude Include="smx\smx.h" />
+    <ClInclude Include="smx\smx_wrapper.h" />
     <ClInclude Include="spiceapi\connection.h" />
     <ClInclude Include="spiceapi\rc4.h" />
     <ClInclude Include="spiceapi\wrappers.h" />

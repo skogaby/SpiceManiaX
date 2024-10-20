@@ -1,4 +1,4 @@
-#include "smx.h"
+#include "smx_wrapper.h"
 
 using namespace std;
 

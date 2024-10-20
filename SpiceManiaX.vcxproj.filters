@@ -28,7 +28,7 @@
     <ClCompile Include="SpiceManiaX.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="smx\smx.cpp">
+    <ClCompile Include="smx\smx_wrapper.cpp">
       <Filter>Source Files\smx</Filter>
     </ClCompile>
     <ClCompile Include="spiceapi\connection.cpp">
@@ -42,7 +42,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="smx\smx.h">
+    <ClInclude Include="smx\smx_wrapper.h">
       <Filter>Source Files\smx</Filter>
     </ClInclude>
     <ClInclude Include="rapidjson\allocators.h">
@@ -158,6 +158,12 @@
     </ClInclude>
     <ClInclude Include="spiceapi\wrappers.h">
       <Filter>Source Files\spiceapi</Filter>
+    </ClInclude>
+    <ClInclude Include="lights_utils.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="input_utils.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

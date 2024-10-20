@@ -1,6 +1,7 @@
 #include "spiceapi/connection.h"
 #include "spiceapi/wrappers.h"
-#include "smx/smx.h"
+#include "smx/smx_wrapper.h"
+#include "lights_utils.h"
 #include <iostream>
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -8,10 +9,12 @@
 #define BIT(value, i) (((value) >> (i)) & 1)
 
 using namespace spiceapi;
+using namespace std;
 
-static SMXWrapper smx_sdk;
 static FILETIME fileTime;
 static uint16_t pad_input_states[2];
+extern map<string, float> light_states;
+extern map<string, vector<uint8_t>> tape_led_states;
 
 // Logging callback for the StepManiaX SDK
 static void smxLogCallback(const char* log) {
@@ -21,11 +24,11 @@ static void smxLogCallback(const char* log) {
 // The callback that's invoked by the StepManiaX SDK whenver the state changes on either
 // of the connected pads (this is not implemented for the cabinet IO, yet)
 static void smxStateChangedCallback(int pad, SMXUpdateCallbackReason reason, void* pUser) {
-    uint16_t state = smx_sdk.SMX_GetInputState(pad);
+    uint16_t state = SMXWrapper::getInstance().SMX_GetInputState(pad);
     pad_input_states[pad] = state;
-    // printf("[SMX] Device %i state changed: %04x\n", pad, state);
+    /* printf("[SMX] Device %i state changed: %04x\n", pad, state);
 
-    /*for (size_t panel = 0; panel < 9; panel++) {
+    for (size_t panel = 0; panel < 9; panel++) {
         printf("%i ", BIT(state, panel));
     }
     printf("\n");*/
@@ -46,14 +49,13 @@ int main() {
         return 1;
     }
 
-    // First, go ahead and start up the StepManiaX SDK, which should connect to devices
-    // as they become available automatically
-    smx_sdk.SMX_SetLogCallback(smxLogCallback);
-    smx_sdk.SMX_Start(smxStateChangedCallback, nullptr);
+    // Start up the StepManiaX SDK, which should init devices automatically as they connect
+    SMXWrapper::getInstance().SMX_SetLogCallback(smxLogCallback);
+    SMXWrapper::getInstance().SMX_Start(smxStateChangedCallback, nullptr);
 
-    if (!smx_sdk.loaded) {
+    if (!SMXWrapper::getInstance().loaded) {
         printf("Unable to load StepManiaX SDK, exiting");
-        return -1;
+        return 1;
     }
 
     printf("Loaded SMX.dll successfully, attempting to connect to SpiceAPI now\n");
@@ -69,8 +71,8 @@ int main() {
     }
 
     printf("Connected to SpiceAPI successfully\n");
-    std::vector<LightState> lights;
-    std::vector<TapeLedLightState> tape_leds;
+
+    // Make sure we're only outputting 
     ULONGLONG last_log_time = getCurrentTimeMicros();
     ULONGLONG last_input_update = getCurrentTimeMicros();
     ULONGLONG last_lights_update = getCurrentTimeMicros();
@@ -82,38 +84,11 @@ int main() {
     do {
         ULONGLONG current_time = getCurrentTimeMicros();
 
-        // Attempt to update the lights every 161 microseconds. This consistently works out to 58Hz. If we wait for
-        // only 160 microseconds, this is consistently 62Hz, and I'd rather be slightly under than slightly over
-        // since the SDK seems to imply we shouldn't send more than 60 lights updates per seconds to the SMX hardware.
-        if (current_time - last_lights_update >= 161) {
-            // First, read the regular light states. We mainly just need this for the subwoofer
-            // corner lights and the stage corner lights, since the rest of the lights we care
-            // about come from the tape LEDs
-            lights.clear();
-            lights_read(con, lights);
-            
-            /*for (const LightState& l : lights) {
-                printf("%s: %f\n", l.name.c_str(), l.value);
-            }*/
+        // Update lights ever 322 microseconds, which works out to 30Hz with Windows timing resolutions
+        if (current_time - last_lights_update >= 322) {
+            perform_lights_tasks(con);
 
-            // Next, read the tape LEDs
-            tape_leds.clear();
-            ddr_tapeled_get(con, tape_leds);
-
-            /*for (const TapeLedLightState& l : tape_leds) {
-                if (l.name == "p1_foot_up") {
-                    printf("%s: [ ", l.name.c_str());
-                    for (uint8_t val : l.values) {
-                        printf("%i ", val);
-                    }
-                    printf("]\n");
-                }
-            }*/
-
-            // Output the stage lights first, since those go as a single update
-
-            // Next, output the cabinet lights, since those are all handled as their own discrete devices
-
+            // Bookeeping
             last_lights_update = current_time;
             lights_updates++;
         }
@@ -129,12 +104,14 @@ int main() {
             // We should already have the pad states in memory due to the SMX callbacks
             // being called from the SMX thread. Therefore, just send them out via SpiceAPI
 
+            // Bookkeeping
             last_input_update = current_time;
             input_updates++;
         }
 
-        // Output the current input and output rates once every 5 seconds
-        if (current_time - last_log_time >= 50000L) {
+        // Output the current input and output rates once every 2 seconds
+        static int out_interval = 2;
+        if (current_time - last_log_time >= 10000L * out_interval) {
             if (input_updates > max_input_updates) {
                 max_input_updates = input_updates;
             }
@@ -144,14 +121,19 @@ int main() {
             }
 
             printf("Max: %i - Min: %i - Lights: %i - Input: %i\n",
-                max_input_updates / 5, min_input_updates / 5, lights_updates / 5, input_updates / 5);
+                max_input_updates / out_interval,
+                min_input_updates / out_interval,
+                lights_updates / out_interval,
+                input_updates / out_interval
+            );
+
             last_log_time = current_time;
             lights_updates = 0;
             input_updates = 0;
         }
-    } while (!(lights.empty() && lights_updates > 0));
+    } while (!(light_states.empty() && lights_updates > 0));
 
     printf("Lost connection to SpiceAPI, exiting\n");
-    smx_sdk.SMX_Stop();
+    SMXWrapper::getInstance().SMX_Stop();
     return 0;
 }
