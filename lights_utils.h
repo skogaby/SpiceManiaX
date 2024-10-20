@@ -1,10 +1,14 @@
 #pragma once
 
+#include "input_utils.h"
 #include "smx/smx_wrapper.h"
 #include "spiceapi/wrappers.h"
 #include <vector>
 #include <map>
 
+// Our hardcoded constants for what color to use for simulating the color
+// of the pads on the DDR Gold cabinets, so we can use this color for the
+// center and corner panels of the stages.
 #define GOLD_R 0xFF
 #define GOLD_G 0xFF
 #define GOLD_B 0x00
@@ -14,9 +18,10 @@ using namespace std;
 
 void perform_lights_tasks(Connection& con);
 void handle_stage_lights_update();
+void handle_cabinet_lights_updates();
 void handle_arrow_panel_light(string& light_data, size_t pad, size_t panel_index);
 void handle_corner_panel_light(string& light_data, size_t pad, size_t panel_index);
-void fill_panel_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
+void fill_stage_panel_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
 void add_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
 
 // The storage for the incoming lights states from Spice API when we call lights::read
@@ -27,7 +32,7 @@ map<string, vector<uint8_t>> tape_led_states;
 
 /*
 	These are just static sets of flags for whether a particular LED is on or off in the outer 4x4
-	grid of LEDs in an SMX panel, whenever a "pad corner light" is one. This is just an L-shaped
+	grid of LEDs in an SMX panel, whenever a "pad corner light" is on. This is just an L-shaped
 	on-off grid, basically. We'll interpolate this into the actual LED values to send, based on how
 	bright the lights are during runtime. We won't need to touch the inner 3x3 grid of LEDs, since
 	we're simulating an L-shape.
@@ -73,10 +78,11 @@ void perform_lights_tasks(Connection& con) {
     lights_read(con, light_states);
     ddr_tapeled_get(con, tape_led_states);
 
-    // Output the stage lights first, since those go as a single update
+    // Output the stage lights first, since those go as a single update to a single API
     handle_stage_lights_update();
 
-    // Next, output the cabinet lights, since those are all handled as their own discrete devices
+    // Next, output the cabinet lights, since those are all handled separately, by a different API
+    handle_cabinet_lights_updates();
 }
 
 // Handles sending the lights updates to the stages. This sources data from both the "normal" LEDs, 
@@ -92,21 +98,21 @@ void handle_stage_lights_update() {
     for (size_t pad = 0; pad < 2; pad++) {
         for (size_t panel = 0; panel < 9; panel++) {
             switch (panel) {
-            case 1: // Up
-            case 3: // Left
-            case 5: // Right
-            case 7: // Down
+            case UP:
+            case LEFT:
+            case RIGHT:
+            case DOWN:
                 handle_arrow_panel_light(light_data, pad, panel);
                 break;
-            case 0: // Upper-left
-            case 2: // Upper-right
-            case 6: // Lower-left
-            case 8: // Lower-right
+            case UP_LEFT:
+            case UP_RIGHT:
+            case DOWN_LEFT:
+            case DOWN_RIGHT:
                 handle_corner_panel_light(light_data, pad, panel);
                 break;
-            case 4: // Center
+            case CENTER:
                 // Just make the center panel statically gold
-                fill_panel_color(light_data, GOLD_R, GOLD_G, GOLD_B);
+                fill_stage_panel_color(light_data, GOLD_R, GOLD_G, GOLD_B);
                 break;
             default:
                 break;
@@ -119,25 +125,27 @@ void handle_stage_lights_update() {
 }
 
 // Handles the lights updates for an arrow panel of a stage by appending the appropriate
-// lights data to the given string.
+// lights data to the given string
 void handle_arrow_panel_light(string& light_data, size_t pad, size_t panel_index) {
     string device_name;
     string device_prefix = "p" + to_string(pad + 1) + "_foot_";
 
     // Figure out which device name we need to index on when pulling the LED data
     switch (panel_index) {
-    case 1:
+    case UP:
         device_name = device_prefix + "up";
         break;
-    case 3:
+    case LEFT:
         device_name = device_prefix + "left";
         break;
-    case 5:
+    case DOWN:
         device_name = device_prefix + "down";
         break;
-    case 7:
+    case RIGHT:
         device_name = device_prefix + "right";
         break;
+    default:
+        return;
     }
 
     // Pull the LED data for this device, and output it to the light string. All
@@ -163,25 +171,23 @@ void handle_corner_panel_light(string& light_data, size_t pad, size_t panel_inde
     // Figure out which device name we need to index on when pulling the LED data, and
     // also which set of LED flags we should use when constructing the outputs
     switch (panel_index) {
-    case 0:
+    case UP_LEFT:
         device_name = device_prefix + "Stage Corner Up-Left";
         flags = pad_upper_left_leds;
         break;
-    case 2:
+    case UP_RIGHT:
         device_name = device_prefix + "Stage Corner Up-Right";
         flags = pad_upper_right_leds;
         break;
-    case 6:
+    case DOWN_LEFT:
         device_name = device_prefix + "Stage Corner Down-Left";
         flags = pad_lower_left_leds;
         break;
-    case 8:
+    case DOWN_RIGHT:
         device_name = device_prefix + "Stage Corner Down-Right";
         flags = pad_lower_right_leds;
         break;
-    }
-
-    if (flags == nullptr) {
+    default:
         return;
     }
 
@@ -207,11 +213,16 @@ void handle_corner_panel_light(string& light_data, size_t pad, size_t panel_inde
     }
 }
 
-// Outputs data for a blank arrow panel
-void fill_panel_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue) {
+// Outputs data to fill an entire stage LED panel with a single color
+void fill_stage_panel_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue) {
     for (size_t i = 0; i < 25; i++) {
         add_color(lights_data, red, green, blue);
     }
+}
+
+// Handles all the updates for all the stage light devices
+void handle_cabinet_lights_updates() {
+    // TODO
 }
 
 // Adds an RGB color to the given string, so we can send the string to the SMX SDK
