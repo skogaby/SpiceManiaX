@@ -9,20 +9,36 @@
 // Our hardcoded constants for what color to use for simulating the color
 // of the pads on the DDR Gold cabinets, so we can use this color for the
 // center and corner panels of the stages.
-#define GOLD_R 0xFF
-#define GOLD_G 0xFF
-#define GOLD_B 0x00
+#define PAD_R 0xBB
+#define PAD_G 0xBB
+#define PAD_B 0x00
+
+// LED counts for various SMX devices
+#define SMX_ARROW_LED_COUNT 25
+#define SMX_MARQUEE_LOGICAL_LED_COUNT 24
+#define SMX_MARQUEE_PHYSICAL_LED_COUNT 12
+#define SMX_VERTICAL_STRIP_LED_COUNT 28
+#define SMX_SPOTLIGHT_LED_COUNT 8
+
+// LED counts for various DDR devices
+#define DDR_ARROW_LED_COUNT 25
+#define DDR_TOP_PANEL_LED_COUNT 40
+#define DDR_VERTICAL_STRIP_LED_COUNT 26
 
 using namespace spiceapi;
 using namespace std;
 
 void perform_lights_tasks(Connection& con);
 void handle_stage_lights_update();
-void handle_cabinet_lights_updates();
+void handle_marquee_lights_update();
+void handle_vertical_strip_lights_update();
+void handle_spotlight_lights_update();
 void handle_arrow_panel_light(string& light_data, size_t pad, size_t panel_index);
 void handle_corner_panel_light(string& light_data, size_t pad, size_t panel_index);
 void fill_stage_panel_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
 void add_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
+int map_value(int x, int in_min, int in_max, int out_min, int out_max);
+uint8_t average(uint8_t a, uint8_t b);
 
 // The storage for the incoming lights states from Spice API when we call lights::read
 map<string, float> light_states;
@@ -82,7 +98,9 @@ void perform_lights_tasks(Connection& con) {
     handle_stage_lights_update();
 
     // Next, output the cabinet lights, since those are all handled separately, by a different API
-    handle_cabinet_lights_updates();
+    handle_marquee_lights_update();
+    handle_vertical_strip_lights_update();
+    handle_spotlight_lights_update();
 }
 
 // Handles sending the lights updates to the stages. This sources data from both the "normal" LEDs, 
@@ -112,7 +130,7 @@ void handle_stage_lights_update() {
                 break;
             case CENTER:
                 // Just make the center panel statically gold
-                fill_stage_panel_color(light_data, GOLD_R, GOLD_G, GOLD_B);
+                fill_stage_panel_color(light_data, PAD_R, PAD_G, PAD_B);
                 break;
             default:
                 break;
@@ -152,7 +170,7 @@ void handle_arrow_panel_light(string& light_data, size_t pad, size_t panel_index
     // arrow panel LED PCBs have 25 LEDs, which matches SMX exactly.
     vector<uint8_t> tapeled = tape_led_states[device_name];
 
-    for (size_t led = 0; led < 25; led++) {
+    for (size_t led = 0; led < SMX_ARROW_LED_COUNT; led++) {
         uint8_t r = tapeled[(led * 3)];
         uint8_t g = tapeled[(led * 3) + 1];
         uint8_t b = tapeled[(led * 3) + 2];
@@ -202,27 +220,145 @@ void handle_corner_panel_light(string& light_data, size_t pad, size_t panel_inde
             if (flags[row][col] != 0) {
                 add_color(light_data, light_value, light_value, light_value);
             } else {
-                add_color(light_data, GOLD_R, GOLD_G, GOLD_B);
+                add_color(light_data, PAD_R, PAD_G, PAD_B);
             }
         }
     }
 
     // Just make the inner 3x3 grid also gold, to match the rest of the pad
     for (size_t i = 0; i < 9; i++) {
-        add_color(light_data, GOLD_R, GOLD_G, GOLD_B);
+        add_color(light_data, PAD_R, PAD_G, PAD_B);
     }
 }
 
 // Outputs data to fill an entire stage LED panel with a single color
 void fill_stage_panel_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue) {
-    for (size_t i = 0; i < 25; i++) {
+    for (size_t i = 0; i < SMX_ARROW_LED_COUNT; i++) {
         add_color(lights_data, red, green, blue);
     }
 }
 
-// Handles all the updates for all the stage light devices
-void handle_cabinet_lights_updates() {
-    // TODO
+// Handles the lights updates for the marquee
+static void handle_marquee_lights_update() {
+    // Read the lights values for the top panel strip
+    vector<uint8_t> tapeled = tape_led_states["top_panel"];
+
+    if (tapeled.empty()) {
+        return;
+    }
+
+    // Map the 40 DDR LEDs onto the 24 SMX marquee LEDs. Since we're mapping more LEDs onto less LEDs,
+    // we'll prefer lit LEDs over blank ones. This will at least make sure that things like single
+    // pixel sweeps won't be missed due to integer mappings going poorly. If we have a conflict between
+    // two lit LEDs, we'll just average them. This is the only strip we need to do this for, since the others
+    // are mapping less LEDs onto more, so we just repeat some, rather than needing a conflict resolution strategy.
+    uint8_t smx_led_out[SMX_MARQUEE_LOGICAL_LED_COUNT * 3] = { 0 };
+    for (size_t ddr_i = 0; ddr_i < DDR_TOP_PANEL_LED_COUNT; ddr_i++) {
+        size_t smx_i = map_value(ddr_i, 0, DDR_TOP_PANEL_LED_COUNT, 12, 0);
+
+        // See what we need to do based on if the current DDR LED is lit, and if we've already
+        // lit the SMX LED at the mapped index
+        uint8_t ddr_r = tapeled[(ddr_i * 3)];
+        uint8_t ddr_g = tapeled[(ddr_i * 3) + 1];
+        uint8_t ddr_b = tapeled[(ddr_i * 3) + 2];
+        bool ddr_is_on = (ddr_r != 0 || ddr_g != 0 || ddr_b != 0);
+
+        // If the current LED isn't on, then it's a no-op, just go to the next LED
+        // since we don't overwrite or average lit LEDs with unlit ones
+        if (!ddr_is_on)
+            continue;
+
+        uint8_t smx_r = smx_led_out[(smx_i * 3)];
+        uint8_t smx_g = smx_led_out[(smx_i * 3) + 1];
+        uint8_t smx_b = smx_led_out[(smx_i * 3) + 2];
+        bool smx_is_on = (smx_r != 0 || smx_g != 0 || smx_b != 0);
+
+        if (!smx_is_on) {
+            // If the DDR LED is on and the SMX LED is off, just replace the SMX LED
+            smx_led_out[(smx_i * 3)] = ddr_r;
+            smx_led_out[(smx_i * 3) + 1] = ddr_g;
+            smx_led_out[(smx_i * 3) + 2] = ddr_b;
+        }
+        else {
+            // If both LEDs are on, then just average them. We will never have more than 2 LEDs assigned
+            // to a single index.
+            smx_led_out[(smx_i * 3)] = average(ddr_r, smx_r);
+            smx_led_out[(smx_i * 3) + 1] = average(ddr_g, smx_g);
+            smx_led_out[(smx_i * 3) + 2] = average(ddr_b, smx_b);
+        }
+    }
+
+    // Send the lights update
+    SMXWrapper::getInstance().SMX_SetDedicatedCabinetLights(
+        SMXDedicatedCabinetLights::MARQUEE,
+        reinterpret_cast<const char*>(&(smx_led_out[0])),
+        SMX_MARQUEE_LOGICAL_LED_COUNT * 3
+    );
+}
+
+// Handles the lights updates for the vertical strip lights
+void handle_vertical_strip_lights_update() {
+    // Read the lights values for the monitor strips
+    vector<uint8_t> tapeled[2] = {
+        tape_led_states["monitor_left"],
+        tape_led_states["monitor_right"]
+    };
+
+    if (tapeled[0].empty() || tapeled[1].empty())
+        return;
+
+    static SMXDedicatedCabinetLights device_ids[2] = {
+        LEFT_STRIP,
+        RIGHT_STRIP
+    };
+
+    // Iterate over both strips, map the monitor LEDs to the vertical strips (25 -> 28 LEDs)
+    for (size_t strip = 0; strip < 2; strip++) {
+        string light_data;
+
+        for (size_t smx_i = 0; smx_i < SMX_VERTICAL_STRIP_LED_COUNT; smx_i++) {
+            // Map the 25 gold cab LEDs to our 28 strip LEDs on SMX
+            size_t ddr_i = map_value(smx_i, 0, SMX_VERTICAL_STRIP_LED_COUNT, DDR_VERTICAL_STRIP_LED_COUNT, 0);
+            uint8_t r = tapeled[strip][(ddr_i * 3)];
+            uint8_t g = tapeled[strip][(ddr_i * 3) + 1];
+            uint8_t b = tapeled[strip][(ddr_i * 3) + 2];
+            add_color(light_data, r, g, b);
+        }
+
+        // Send the lights update
+        SMXWrapper::getInstance().SMX_SetDedicatedCabinetLights(
+            device_ids[strip], light_data.data(), light_data.size()
+        );
+    }
+}
+
+// Handles the lights updates for the 3 spotlights
+void handle_spotlight_lights_update() {
+    // Read the lights values for the subwoofer corner lights
+    uint8_t light1 = light_states["GOLD P1 Woofer Corner"] * 255.f;
+    uint8_t light2 = light_states["GOLD P2 Woofer Corner"] * 255.f;
+    vector<uint8_t> light_values = { light1, light2 };
+
+    static SMXDedicatedCabinetLights device_ids[2] = {
+        LEFT_SPOTLIGHTS,
+        RIGHT_SPOTLIGHTS
+    };
+
+    // Iterate over each set of spotlights, turn them all white according to the brightness of the
+    // woofer corner lights for each player
+    for (size_t device = 0; device < 2; device++) {
+        uint8_t light_value = light_values[device];
+        string light_data;
+
+        for (size_t i = 0; i < 8; i++) {
+            add_color(light_data, light_value, light_value, light_value);
+        }
+
+        // Send the lights update
+        SMXWrapper::getInstance().SMX_SetDedicatedCabinetLights(
+            device_ids[device], light_data.data(), light_data.size()
+        );
+    }
 }
 
 // Adds an RGB color to the given string, so we can send the string to the SMX SDK
@@ -231,4 +367,16 @@ void add_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue) {
     lights_data.append(1, red);
     lights_data.append(1, green);
     lights_data.append(1, blue);
+}
+
+// Map a value from one numberspace to another. We mainly use this for interpolating LED strips
+// of one length to an LED strip of another length (either truncate or repeat values; this doesn't
+// interpolate the actual LED values
+int map_value(int x, int in_min, int in_max, int out_min, int out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+// Average two bytes together, for crude color averaging during LED interpolation
+uint8_t average(uint8_t a, uint8_t b) {
+    return (uint8_t) (((uint16_t) a + (uint16_t) b) / 2);
 }

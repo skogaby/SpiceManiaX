@@ -1,6 +1,7 @@
 #pragma once
 
-// Constants for the panel indices on each pad
+// Constants for the panel indices on each pad, these are defined by the StepManiaX SDK
+// left-to-right, top-to-bottom
 #define UP_LEFT 0
 #define UP 1
 #define UP_RIGHT 2
