@@ -6,6 +6,8 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
+#define DEBUG false
+
 using namespace spiceapi;
 using namespace std;
 
@@ -95,7 +97,7 @@ int main() {
 
         // Output the current input and output rates once every 2 seconds
         static int out_interval = 2;
-        if (current_time - last_log_time >= 10000L * out_interval) {
+        if (DEBUG && (current_time - last_log_time >= 10000L * out_interval)) {
             if (input_updates > max_input_updates) {
                 max_input_updates = input_updates;
             }
