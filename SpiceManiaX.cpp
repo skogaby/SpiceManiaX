@@ -6,36 +6,21 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-#define BIT(value, i) (((value) >> (i)) & 1)
-
 using namespace spiceapi;
 using namespace std;
 
 static FILETIME fileTime;
-static uint16_t pad_input_states[2];
+extern uint16_t pad_input_states[2];
 extern map<string, float> light_states;
 extern map<string, vector<uint8_t>> tape_led_states;
 
 // Logging callback for the StepManiaX SDK
-static void smxLogCallback(const char* log) {
+static void smx_on_log(const char* log) {
     printf("[SMX] %s\n", log);
 }
 
-// The callback that's invoked by the StepManiaX SDK whenver the state changes on either
-// of the connected pads (this is not implemented for the cabinet IO, yet)
-static void smxStateChangedCallback(int pad, SMXUpdateCallbackReason reason, void* pUser) {
-    uint16_t state = SMXWrapper::getInstance().SMX_GetInputState(pad);
-    pad_input_states[pad] = state;
-    /* printf("[SMX] Device %i state changed: %04x\n", pad, state);
-
-    for (size_t panel = 0; panel < 9; panel++) {
-        printf("%i ", BIT(state, panel));
-    }
-    printf("\n");*/
-}
-
 // Get the current system time in microseconds
-static ULONGLONG getCurrentTimeMicros() {
+static ULONGLONG get_current_time_micros() {
     GetSystemTimeAsFileTime(&fileTime);
     return ((static_cast<ULONGLONG>(fileTime.dwHighDateTime) << 32) | fileTime.dwLowDateTime) / 1000L;
 }
@@ -50,8 +35,8 @@ int main() {
     }
 
     // Start up the StepManiaX SDK, which should init devices automatically as they connect
-    SMXWrapper::getInstance().SMX_SetLogCallback(smxLogCallback);
-    SMXWrapper::getInstance().SMX_Start(smxStateChangedCallback, nullptr);
+    SMXWrapper::getInstance().SMX_SetLogCallback(smx_on_log);
+    SMXWrapper::getInstance().SMX_Start(smx_on_state_changed, nullptr);
 
     if (!SMXWrapper::getInstance().loaded) {
         printf("Unable to load StepManiaX SDK, exiting");
@@ -73,16 +58,16 @@ int main() {
     printf("Connected to SpiceAPI successfully\n");
 
     // Make sure we're only outputting 
-    ULONGLONG last_log_time = getCurrentTimeMicros();
-    ULONGLONG last_input_update = getCurrentTimeMicros();
-    ULONGLONG last_lights_update = getCurrentTimeMicros();
+    ULONGLONG last_log_time = get_current_time_micros();
+    ULONGLONG last_input_update = get_current_time_micros();
+    ULONGLONG last_lights_update = get_current_time_micros();
     int lights_updates = 0;
     int input_updates = 0;
     int max_input_updates = 0;
     int min_input_updates = 100000000;
 
     do {
-        ULONGLONG current_time = getCurrentTimeMicros();
+        ULONGLONG current_time = get_current_time_micros();
 
         // Update lights ever 322 microseconds, which works out to 30Hz with Windows timing resolutions
         if (current_time - last_lights_update >= 322) {
@@ -94,15 +79,14 @@ int main() {
         }
 
         // Attempt to update the inputs at 1000Hz. This number gets us pretty consistently
-        // at 1000-10005Hz, but Windows scheduling ain't perfect. The resolution of the system
+        // at 995-10005Hz, but Windows scheduling ain't perfect. The resolution of the system
         // time isn't actually high enough that this happens every 5 microseconds, but if we go
-        // higher than 5, we start to see instances of only hitting like 990Hz of input rate.
+        // higher than "5", we start to see instances of only hitting like 970Hz of input rate.
         // This sometimes goes slightly over 1000Hz, but that's not inherently a bad thing since
         // we're just sending Spice API calls here, and the updates from the SMX pads are happening
         // asynchronously anyway.
         if (current_time - last_input_update >= 5) {
-            // We should already have the pad states in memory due to the SMX callbacks
-            // being called from the SMX thread. Therefore, just send them out via SpiceAPI
+            perform_input_tasks(con);
 
             // Bookkeeping
             last_input_update = current_time;

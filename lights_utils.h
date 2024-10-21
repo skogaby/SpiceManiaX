@@ -6,9 +6,8 @@
 #include <vector>
 #include <map>
 
-// Our hardcoded constants for what color to use for simulating the color
-// of the pads on the DDR Gold cabinets, so we can use this color for the
-// center and corner panels of the stages.
+// Hardcode the color of the pads, for the center panel and the corner panels (besides
+// the portion emulating the corner lights)
 #define PAD_R 0xBB
 #define PAD_G 0xBB
 #define PAD_B 0x00
@@ -129,7 +128,7 @@ void handle_stage_lights_update() {
                 handle_corner_panel_light(light_data, pad, panel);
                 break;
             case CENTER:
-                // Just make the center panel statically gold
+                // Just make the center panel a static color
                 fill_stage_panel_color(light_data, PAD_R, PAD_G, PAD_B);
                 break;
             default:
@@ -247,7 +246,7 @@ static void handle_marquee_lights_update() {
         return;
     }
 
-    // Map the 40 DDR LEDs onto the 24 SMX marquee LEDs. Since we're mapping more LEDs onto less LEDs,
+    // Map the 40 DDR LEDs onto the 12 SMX marquee LEDs. Since we're mapping more LEDs onto less LEDs,
     // we'll prefer lit LEDs over blank ones. This will at least make sure that things like single
     // pixel sweeps won't be missed due to integer mappings going poorly. If we have a conflict between
     // two lit LEDs, we'll just average them. This is the only strip we need to do this for, since the others
@@ -280,8 +279,7 @@ static void handle_marquee_lights_update() {
             smx_led_out[(smx_i * 3) + 2] = ddr_b;
         }
         else {
-            // If both LEDs are on, then just average them. We will never have more than 2 LEDs assigned
-            // to a single index.
+            // If both LEDs are on, then just average them
             smx_led_out[(smx_i * 3)] = average(ddr_r, smx_r);
             smx_led_out[(smx_i * 3) + 1] = average(ddr_g, smx_g);
             smx_led_out[(smx_i * 3) + 2] = average(ddr_b, smx_b);
@@ -312,12 +310,12 @@ void handle_vertical_strip_lights_update() {
         RIGHT_STRIP
     };
 
-    // Iterate over both strips, map the monitor LEDs to the vertical strips (25 -> 28 LEDs)
+    // Iterate over both strips, map the monitor LEDs to the vertical strips (26 -> 28 LEDs)
     for (size_t strip = 0; strip < 2; strip++) {
         string light_data;
 
         for (size_t smx_i = 0; smx_i < SMX_VERTICAL_STRIP_LED_COUNT; smx_i++) {
-            // Map the 25 gold cab LEDs to our 28 strip LEDs on SMX
+            // Map the 26 gold cab LEDs to our 28 strip LEDs on SMX
             size_t ddr_i = map_value(smx_i, 0, SMX_VERTICAL_STRIP_LED_COUNT, DDR_VERTICAL_STRIP_LED_COUNT, 0);
             uint8_t r = tapeled[strip][(ddr_i * 3)];
             uint8_t g = tapeled[strip][(ddr_i * 3) + 1];
