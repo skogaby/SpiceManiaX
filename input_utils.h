@@ -21,19 +21,25 @@ using namespace std;
 
 #define BIT(value, i) (((value) >> (i)) & 1)
 
+extern Connection* con;
+// Buffer to hold our input states
 static uint16_t pad_input_states[2];
-
-void perform_input_tasks(Connection& con);
-
-// Main function for sending inputs to SpiceAPI, called once every millisecond.
-void perform_input_tasks(Connection& con) {
-    static string input_names[2][4] = {
+// The input names that SpiceAPI expects for each panel
+static string input_names[2][4] = {
         { "P1 Panel Up", "P1 Panel Down", "P1 Panel Left", "P1 Panel Right" },
         { "P2 Panel Up", "P2 Panel Down", "P2 Panel Left", "P2 Panel Right" },
-    };
-    static size_t panel_indices[4] = { 1, 7, 3, 5 };
+};
+// The StepManiaX panel indices which correspond to the panel at the same index
+// in `input_names` above.
+static size_t panel_indices[4] = { 1, 7, 3, 5 };
 
-    // Just send a SpiceAPI update with all our button values
+// The callback that's invoked by the StepManiaX SDK whenver the state changes on either
+// of the connected pads (this is not implemented for the cabinet IO, yet)
+static void smx_on_state_changed(int pad, SMXUpdateCallbackReason reason, void* pUser) {
+    // Get the input state (for some reason the callback does not include it as a parameter...)
+    /* pad_input_states[pad] = SMXWrapper::getInstance().SMX_GetInputState(pad);
+
+    // Send a SpiceAPI update with all our button values
     vector<ButtonState> button_states;
     for (size_t player = 0; player < 2; player++) {
         for (size_t panel = 0; panel < 4; panel++) {
@@ -44,12 +50,5 @@ void perform_input_tasks(Connection& con) {
         }
     }
 
-    buttons_write(con, button_states);
-}
-
-// The callback that's invoked by the StepManiaX SDK whenver the state changes on either
-// of the connected pads (this is not implemented for the cabinet IO, yet)
-static void smx_on_state_changed(int pad, SMXUpdateCallbackReason reason, void* pUser) {
-    uint16_t state = SMXWrapper::getInstance().SMX_GetInputState(pad);
-    pad_input_states[pad] = state;
+    buttons_write(*con, button_states); */
 }

@@ -6,6 +6,10 @@
 #include <vector>
 #include <map>
 
+#define POLL_TAPE_LED true
+#define POLL_LIGHTS true
+#define OUTPUT_LIGHTS true
+
 // Hardcode the color of the pads, for the center panel and the corner panels (besides
 // the portion emulating the corner lights)
 #define PAD_R 0xBB
@@ -22,12 +26,12 @@
 // LED counts for various DDR devices
 #define DDR_ARROW_LED_COUNT 25
 #define DDR_TOP_PANEL_LED_COUNT 40
-#define DDR_VERTICAL_STRIP_LED_COUNT 26
+#define DDR_VERTICAL_STRIP_LED_COUNT 25
 
 using namespace spiceapi;
 using namespace std;
 
-void perform_lights_tasks(Connection& con);
+void perform_lights_tasks(Connection* con);
 void handle_stage_lights_update();
 void handle_marquee_lights_update();
 void handle_vertical_strip_lights_update();
@@ -86,20 +90,28 @@ static uint8_t pad_lower_right_leds[4][4] = {
 };
 
 // Perform the various lights related tasks on a cadence of 30Hz
-void perform_lights_tasks(Connection& con) {
+void perform_lights_tasks(Connection* con) {
     // Read all the light states from SpiceAPI, for both the regular lights and the tape LEDs
     light_states.clear();
     tape_led_states.clear();
-    lights_read(con, light_states);
-    ddr_tapeled_get(con, tape_led_states);
 
-    // Output the stage lights first, since those go as a single update to a single API
-    handle_stage_lights_update();
+    if (POLL_LIGHTS) {
+        lights_read(*con, light_states);
+    }
 
-    // Next, output the cabinet lights, since those are all handled separately, by a different API
-    handle_marquee_lights_update();
-    handle_vertical_strip_lights_update();
-    handle_spotlight_lights_update();
+    if (POLL_TAPE_LED) {
+        ddr_tapeled_get(*con, tape_led_states);
+    }
+
+    if (OUTPUT_LIGHTS) {
+        // Output the stage lights first, since those go as a single update to a single API
+        handle_stage_lights_update();
+
+        // Next, output the cabinet lights, since those are all handled separately, by a different API
+        handle_marquee_lights_update();
+        handle_vertical_strip_lights_update();
+        handle_spotlight_lights_update();
+    }
 }
 
 // Handles sending the lights updates to the stages. This sources data from both the "normal" LEDs, 
@@ -144,6 +156,9 @@ void handle_stage_lights_update() {
 // Handles the lights updates for an arrow panel of a stage by appending the appropriate
 // lights data to the given string
 void handle_arrow_panel_light(string& light_data, size_t pad, size_t panel_index) {
+    if (tape_led_states.empty())
+        return;
+
     string device_name;
     string device_prefix = "p" + to_string(pad + 1) + "_foot_";
 
@@ -181,6 +196,9 @@ void handle_arrow_panel_light(string& light_data, size_t pad, size_t panel_index
 // lights data to the given string based on the given flags (indicating which corner
 // this is for), combined with the incoming lights data from SpiceAPI.
 void handle_corner_panel_light(string& light_data, size_t pad, size_t panel_index) {
+    if (light_states.empty())
+        return;
+
     string device_name;
     string device_prefix = "GOLD P" + to_string(pad + 1) + " ";
     uint8_t (*flags)[4] = nullptr;
@@ -239,6 +257,9 @@ void fill_stage_panel_color(string& lights_data, uint8_t red, uint8_t green, uin
 
 // Handles the lights updates for the marquee
 static void handle_marquee_lights_update() {
+    if (tape_led_states.empty())
+        return;
+
     // Read the lights values for the top panel strip
     vector<uint8_t> tapeled = tape_led_states["top_panel"];
 
@@ -296,6 +317,9 @@ static void handle_marquee_lights_update() {
 
 // Handles the lights updates for the vertical strip lights
 void handle_vertical_strip_lights_update() {
+    if (tape_led_states.empty())
+        return;
+
     // Read the lights values for the monitor strips
     vector<uint8_t> tapeled[2] = {
         tape_led_states["monitor_left"],
