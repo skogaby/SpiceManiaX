@@ -129,14 +129,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="lights_utils.cpp" />
     <ClCompile Include="smx\smx_wrapper.cpp" />
     <ClCompile Include="spiceapi\connection.cpp" />
     <ClCompile Include="spiceapi\rc4.cpp" />
     <ClCompile Include="spiceapi\wrappers.cpp" />
     <ClCompile Include="SpiceManiaX.cpp" />
+    <ClCompile Include="stage_input_utils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="input_utils.h" />
+    <ClInclude Include="stage_input_utils.h" />
     <ClInclude Include="lights_utils.h" />
     <ClInclude Include="rapidjson\allocators.h" />
     <ClInclude Include="rapidjson\document.h" />
