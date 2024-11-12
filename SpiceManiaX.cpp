@@ -8,6 +8,7 @@
 #include <d2d1.h>
 #include <mmsystem.h>
 #include <windows.h>
+#include <winuser.h>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -125,11 +126,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         NULL, NULL, hInstance, NULL
     );
 
+    // Set the window styling so it's transparent, borderless, and always on top
     SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
     SetWindowLongPtr(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
     SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_NOACTIVATE);
     SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, DDR_SCREEN_W, DDR_SCREEN_H, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 
+    // Disable visual feedback for touch inputs
+    BOOL feedbackEnabled = FALSE;
+    SystemParametersInfo(SPI_SETTOUCHPREDICTIONPARAMETERS, 0, &feedbackEnabled, SPIF_SENDCHANGE);
+    SystemParametersInfo(SPI_SETCONTACTVISUALIZATION, 0, NULL, SPIF_SENDCHANGE);
+
+    // Actually show the overlay window
     ShowWindow(hwnd, nCmdShow);
 
     // Define button positions
@@ -138,7 +146,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     // Initialize button states
     for (size_t i = 0; i < buttons.size(); ++i) {
-        overlay_button_states[i] = false; // False means "not pressed"
+        overlay_button_states[i] = false;
     }
 
     // Enable touch input
