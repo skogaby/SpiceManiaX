@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stage_input_utils.h"
+#include "input_utils.h"
 #include "smx/smx_wrapper.h"
 #include "spiceapi/wrappers.h"
 #include <vector>

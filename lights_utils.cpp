@@ -303,9 +303,8 @@ void LightsUtils::add_color(string& lights_data, uint8_t red, uint8_t green, uin
     lights_data.append(1, blue);
 }
 
-// Map a value from one numberspace to another. We mainly use this for interpolating LED strips
-// of one length to an LED strip of another length (either truncate or repeat values; this doesn't
-// interpolate the actual LED values
+// Map a value from one numberspace to another, while maintaining proportionality between the input
+// numberspace and the output value with respect to the output numberspace.
 int LightsUtils::map_value(int x, int in_min, int in_max, int out_min, int out_max) {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }

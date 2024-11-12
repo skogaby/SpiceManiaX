@@ -22,10 +22,12 @@ using namespace std;
 
 #define BIT(value, i) (((value) >> (i)) & 1)
 
-class StageInputUtils {
+extern map<int, bool> overlay_button_states;
+
+class InputUtils {
 public:
     static void SMXStateChangedCallback(int pad, SMXUpdateCallbackReason reason, void* pUser);
-    void perform_stage_input_tasks(Connection& con);
+    void perform_input_tasks(Connection& con);
 
 private:
     void smx_on_state_changed(int pad);

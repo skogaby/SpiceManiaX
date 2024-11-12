@@ -23,7 +23,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{706b71ab-7415-4392-a89b-ed91b599fe1d}</ProjectGuid>
     <RootNamespace>SpiceManiaX</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -122,7 +122,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -135,10 +135,11 @@
     <ClCompile Include="spiceapi\rc4.cpp" />
     <ClCompile Include="spiceapi\wrappers.cpp" />
     <ClCompile Include="SpiceManiaX.cpp" />
-    <ClCompile Include="stage_input_utils.cpp" />
+    <ClCompile Include="input_utils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stage_input_utils.h" />
+    <ClInclude Include="math_utils.h" />
+    <ClInclude Include="input_utils.h" />
     <ClInclude Include="lights_utils.h" />
     <ClInclude Include="rapidjson\allocators.h" />
     <ClInclude Include="rapidjson\document.h" />

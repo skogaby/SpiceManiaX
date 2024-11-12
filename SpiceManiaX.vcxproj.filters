@@ -43,7 +43,7 @@
     <ClCompile Include="lights_utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="stage_input_utils.cpp">
+    <ClCompile Include="input_utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -168,7 +168,10 @@
     <ClInclude Include="lights_utils.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="stage_input_utils.h">
+    <ClInclude Include="input_utils.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="math_utils.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
