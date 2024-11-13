@@ -47,9 +47,9 @@ private:
     void HandleArrowPanelLight(string& light_data, size_t pad, size_t panel_index);
     void HandleCornerPanelLight(string& light_data, size_t pad, size_t panel_index);
     void FillStagePanelColor(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
-    void AddColor(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
-    int MapValue(int x, int in_min, int in_max, int out_min, int out_max);
-    uint8_t Average(uint8_t a, uint8_t b);
+    static inline void AddColor(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
+    static inline int MapValue(int x, int in_min, int in_max, int out_min, int out_max);
+    static inline uint8_t Average(uint8_t a, uint8_t b);
 
     // The storage for the incoming lights states from Spice API when we call lights::read
     map<string, float> light_states_;
