@@ -1,6 +1,7 @@
 #pragma once
 
 #include "input_utils.h"
+#include "math_utils.h"
 #include "smx/smx_wrapper.h"
 #include "spiceapi/wrappers.h"
 #include <vector>
@@ -15,21 +16,21 @@ using namespace std;
 
 // Hardcode the color of the pads, for the center panel and the corner panels (besides
 // the portion emulating the corner lights)
-const uint8_t kPadRed = 0xBB;
-const uint8_t kPadGreen = 0xBB;
-const uint8_t kPadBlue = 0x00;
+static const uint8_t kPadRed = 0xBB;
+static const uint8_t kPadGreen = 0xBB;
+static const uint8_t kPadBlue = 0x00;
 
 // LED counts for various SMX devices
-const size_t kSmxArrowLedCount = 25;
-const size_t kSmxMarqueeLogicalLedCount = 24;
-const size_t kSmxMarqueePhysicalLedCount = 12;
-const size_t kSmxVerticalStripLedCount = 28;
-const size_t kSmxSpotlightLedCount = 8;
+static const size_t kSmxArrowLedCount = 25;
+static const size_t kSmxMarqueeLogicalLedCount = 24;
+static const size_t kSmxMarqueePhysicalLedCount = 12;
+static const size_t kSmxVerticalStripLedCount = 28;
+static const size_t kSmxSpotlightLedCount = 8;
 
 // LED counts for various DDR devices
-const size_t kDdrArrowLedCount = 25;
-const size_t kDdrTopPanelLedCount = 40;
-const size_t kDdrVerticalStripLedCount = 25;
+static const size_t kDdrArrowLedCount = 25;
+static const size_t kDdrTopPanelLedCount = 40;
+static const size_t kDdrVerticalStripLedCount = 25;
 
 /*
     Utility class for handling lights output. It basically just exposes a single function to
@@ -48,7 +49,6 @@ private:
     void HandleCornerPanelLight(string& light_data, size_t pad, size_t panel_index);
     void FillStagePanelColor(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
     static inline void AddColor(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
-    static inline int MapValue(int x, int in_min, int in_max, int out_min, int out_max);
     static inline uint8_t Average(uint8_t a, uint8_t b);
 
     // The storage for the incoming lights states from Spice API when we call lights::read

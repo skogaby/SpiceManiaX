@@ -303,12 +303,6 @@ inline void LightsUtils::AddColor(string& lights_data, uint8_t red, uint8_t gree
     lights_data.append(1, blue);
 }
 
-// Map a value from one numberspace to another, while maintaining proportionality between the input
-// numberspace and the output value with respect to the output numberspace.
-inline int LightsUtils::MapValue(int x, int in_min, int in_max, int out_min, int out_max) {
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
 // Average two bytes together, for crude color averaging during LED interpolation
 inline uint8_t LightsUtils::Average(uint8_t a, uint8_t b) {
     return (uint8_t)(((uint16_t)a + (uint16_t)b) / 2);

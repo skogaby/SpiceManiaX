@@ -3,11 +3,14 @@
 #include "smx/smx_wrapper.h"
 #include "lights_utils.h"
 #include "input_utils.h"
+#include "overlay_utils.h"
 #include "math_utils.h"
+#include "globals.h"
 
 #include <d2d1.h>
 #include <mmsystem.h>
 #include <windows.h>
+#include <windowsx.h>
 #include <winuser.h>
 #include <iostream>
 #include <sstream>
@@ -21,6 +24,15 @@
 using namespace spiceapi;
 using namespace std;
 
+// Forward function declarations
+void HandleWindowPress(int x, int y, bool pressed);
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void SmxOnLog(const char* log);
+void WaitForConnection();
+void CALLBACK LightsTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK InputTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+
 // Timer interval for how often we update the overlay graphics (30fps)
 const int kFramerateIntervalMs = 33;
 // Timer interval for when to update the lights on the cabinet (30Hz)
@@ -31,59 +43,25 @@ const int kInputsUpdateIntervalMs = 1;
 const int kSetWindowPosIntervalMs = 5000;
 // We check for SpiceAPI connections during runtime every 3 seconds
 const int kConnectionCheckIntervalMs = 1000;
-// Fullscreen width when DDR is running
-const int kDdrScreenWidth = 1280;
-// Fullscreen height when DDR is running
-const int kDdrScreenHeight = 720;
-// TODO: Remove these
-const int kButtonWidth = 100;
-const int kButtonHeight = 50;
 
-// Forward function declarations
-LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-void SmxOnLog(const char* log);
-void WaitForConnection();
-void CALLBACK LightsTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void CALLBACK InputTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void CALLBACK RedrawTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void InitializeDirect2D(HWND hwnd);
-void CleanupDirect2D();
-void DrawButtons();
-void DrawButtonsToCache();
-
-// Reference to the main window, once it's created
-HWND hwnd;
 // Our connection object for communication with SpiceAPI
 Connection con("localhost", 1337, "spicemaniax");
 // Util class for handling lights interactions (reading lights from SpiceAPI, outputting via SMX SDK)
 LightsUtils lights_util;
 // Util class for handling stage input ineractions (read stage inputs when the state changes, output via SpiceAPI)
 InputUtils input_utils;
-// Flag for whether SpiceAPI is connected or not
-bool is_connected = false;
 // Media Timer ID for the lights timer
-UINT lights_timer_id;
+static UINT lights_timer_id;
 // Media Timer ID for the stage inputs timer
-UINT stage_input_timer_id;
+static UINT stage_input_timer_id;
 // Media Timer ID for checking Spice API connectivity
-UINT connection_check_timer_id;
+static UINT connection_check_timer_id;
 // Media Timer ID for redrawing the overlay
-UINT redraw_timer_id;
+static UINT redraw_timer_id;
 // Media Timer ID for updating the window position
-UINT window_position_timer_id;
+static UINT window_position_timer_id;
 
-// Global variables for Direct2D setup and contexts
-HINSTANCE h_inst;
-vector<RECT> buttons; // Array of button rectangles
-map<int, bool> overlay_button_states; // Track button press states
-ID2D1Factory* d2d_factory = nullptr;
-ID2D1HwndRenderTarget* render_target = nullptr;
-ID2D1SolidColorBrush* brush_normal = nullptr;
-ID2D1SolidColorBrush* brush_pressed = nullptr;
-ID2D1BitmapRenderTarget* cache_render_target = nullptr; // Cached render target
-
+// Program entrypoint
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Create a console window we can use for logging
     if (AllocConsole()) {
@@ -114,7 +92,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     is_connected = true;
 
     // Setup the actual overlay window, now that SpiceAPI is connected
-    h_inst = hInstance;
     WNDCLASS wc = {};
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
@@ -146,20 +123,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Actually show the overlay window
     ShowWindow(hwnd, nCmdShow);
 
-    // Define button positions
-    buttons.push_back({ 100, 100, 100 + kButtonWidth, 100 + kButtonHeight });
-    buttons.push_back({ 300, 100, 300 + kButtonWidth, 100 + kButtonHeight });
-
-    // Initialize button states
-    for (size_t i = 0; i < buttons.size(); ++i) {
-        overlay_button_states[i] = false;
-    }
-
     // Enable touch input
     RegisterTouchWindow(hwnd, 0);
 
-    // Initialize Direct2D
-    InitializeDirect2D(hwnd);
+    // Initialize Direct2D and create the touch overlay elements
+    InitializeTouchOverlay();
 
     // Set system media timer resolution to 1 ms, so we can have accurate timers for inputs and outputs
     timeBeginPeriod(1);
@@ -192,16 +160,38 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     timeKillEvent(window_position_timer_id);
     // Reset the timer resolution period
     timeEndPeriod(1);
-    // Cleanup the Direct2D contexts
-    CleanupDirect2D();
     // Deregister the window for touch events
     UnregisterTouchWindow(hwnd);
-    // Free the console window we allocated
-    FreeConsole();
+    // Cleanup the touch overlay and release the Direct2D objects
+    CleanupTouchOverlay();
     // Kill the SMX SDK
     smx.SMX_Stop();
+    // Free the console window we allocated
+    FreeConsole();
 
     return 0;
+}
+
+// Handles a window press, either from a touchscreen or from a mouse, and presses the appropriate
+// Overlay button
+void HandleWindowPress(int x, int y, bool pressed) {
+    // If the current screen width and height aren't 720p and don't match our render target resolution,
+    // then we need to map the press inputs from the screen coordinates to our render coordinates so
+    // the touches still register correctly
+    int screen_w = GetSystemMetrics(SM_CXSCREEN);
+    int screen_h = GetSystemMetrics(SM_CYSCREEN);
+
+    if (screen_w != kDdrScreenWidth || screen_h != kDdrScreenHeight) {
+        x = MapValue(x, 0, screen_w, 0, kDdrScreenWidth);
+        y = MapValue(y, 0, screen_h, 0, kDdrScreenHeight);
+    }
+
+    // Check which buttons the touches are in bounds for
+    for (size_t j = 0; j < overlay_buttons.size(); ++j) {
+        if (PtInRect(&overlay_buttons[j], POINT{ x, y })) {
+            overlay_button_states[j] = pressed;
+        }
+    }
 }
 
 // Handler for incoming Windows messages to the overlay window
@@ -214,41 +204,37 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
         DrawButtons();
         EndPaint(hwnd, &ps);
         break;
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONUP: {
+        // Handle mouse input for remote debugging
+        HandleWindowPress(
+            GET_X_LPARAM(l_param),
+            GET_Y_LPARAM(l_param),
+            (msg == WM_LBUTTONDOWN)
+        );
+
+        break;
+    }
     case WM_TOUCH: {
         // Message signalling an incoming touch event on the screen
         UINT num_inputs = LOWORD(w_param);
         TOUCHINPUT touches[10];
 
-        if (GetTouchInputInfo((HTOUCHINPUT)l_param, num_inputs, touches, sizeof(TOUCHINPUT))) {
+        if (GetTouchInputInfo((HTOUCHINPUT) l_param, num_inputs, touches, sizeof(TOUCHINPUT))) {
             for (UINT i = 0; i < num_inputs; i++) {
                 // Convert from 0.01mm to pixels
                 int x = touches[i].x / 100;
                 int y = touches[i].y / 100;
 
-                // If the current screen width and height aren't 720p and don't match our render target resolution,
-                // then we need to map the touch inputs from the screen coordinates to our render coordinates so
-                // the touches still register correctly
-                int screen_w = GetSystemMetrics(SM_CXSCREEN);
-                int screen_h = GetSystemMetrics(SM_CYSCREEN);
-
-                if (screen_w != kDdrScreenWidth || screen_h != kDdrScreenHeight) {
-                    x = MapValue(x, 0, screen_w, 0, kDdrScreenWidth);
-                    y = MapValue(y, 0, screen_h, 0, kDdrScreenHeight);
-                }
-
-                // Check which buttons the touches are in bounds for
-                for (size_t j = 0; j < buttons.size(); ++j) {
-                    if (PtInRect(&buttons[j], POINT{ x, y })) {
-                        if ((touches[i].dwFlags & TOUCHEVENTF_DOWN)) {
-                            overlay_button_states[j] = true;
-                        } else if ((touches[i].dwFlags & TOUCHEVENTF_UP)) {
-                            overlay_button_states[j] = false;
-                        }
-                    }
+                // Determine if this was a press or not
+                if (touches[i].dwFlags & TOUCHEVENTF_DOWN) {
+                    HandleWindowPress(x, y, true);
+                } else if (touches[i].dwFlags & TOUCHEVENTF_UP) {
+                    HandleWindowPress(x, y, false);
                 }
             }
 
-            CloseTouchInputHandle((HTOUCHINPUT)l_param);
+            CloseTouchInputHandle((HTOUCHINPUT) l_param);
         }
         break;
     }
@@ -256,7 +242,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
         PostQuitMessage(0);
         break;
     case WM_KEYDOWN:
-        // Exit the overlay if the user presses Escape
+        // Exit the program if the user presses Escape
         if (w_param == VK_ESCAPE) {
             PostQuitMessage(0);
         }
@@ -267,7 +253,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
 
     return 0;
 }
-
 
 // Logging callback for the StepManiaX SDK
 void SmxOnLog(const char* log) {
@@ -298,91 +283,4 @@ void CALLBACK InputTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
 // Callback for the timer which triggers a SpiceAPI connectivity check
 void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
     is_connected = con.check();
-}
-
-// Callback for the timer which triggers an overlay redraw
-void CALLBACK RedrawTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    InvalidateRect(hwnd, NULL, FALSE);
-}
-
-// Callback for the timer which triggers the window to reposition itself on top of everything else
-void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kDdrScreenWidth, kDdrScreenHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
-}
-
-void InitializeDirect2D(HWND hwnd) {
-    // Initialize the Direct2D Factory
-    D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d_factory);
-
-    // Create the main Direct2D render target for the window
-    RECT rc;
-    GetClientRect(hwnd, &rc);
-    d2d_factory->CreateHwndRenderTarget(
-        D2D1::RenderTargetProperties(),
-        D2D1::HwndRenderTargetProperties(hwnd, D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top)),
-        &render_target
-    );
-
-    // Create an off-screen render target for caching static button backgrounds
-    render_target->CreateCompatibleRenderTarget(&cache_render_target);
-
-    // Create brushes for button states
-    render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::CornflowerBlue), &brush_normal);
-    render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Red), &brush_pressed);
-
-    // Draw static content (buttons in normal state) to the off-screen render target
-    cache_render_target->BeginDraw();
-    DrawButtonsToCache();
-    cache_render_target->EndDraw();
-}
-
-void CleanupDirect2D() {
-    if (brush_normal) brush_normal->Release();
-    if (brush_pressed) brush_pressed->Release();
-    if (cache_render_target) cache_render_target->Release();
-    if (render_target) render_target->Release();
-    if (d2d_factory) d2d_factory->Release();
-}
-
-void DrawButtonsToCache() {
-    // Draw static button backgrounds to the off-screen render target
-    for (const auto& button : buttons) {
-        D2D1_RECT_F rect = D2D1::RectF(
-            static_cast<float>(button.left),
-            static_cast<float>(button.top),
-            static_cast<float>(button.right),
-            static_cast<float>(button.bottom)
-        );
-        cache_render_target->FillRectangle(rect, brush_normal);
-    }
-}
-
-void DrawButtons() {
-    if (!render_target) return;
-
-    render_target->BeginDraw();
-    render_target->Clear(D2D1::ColorF(0, 0.0f)); // Clear with transparent background
-
-    // Draw cached button backgrounds
-    ID2D1Bitmap* pBitmap = nullptr;
-    cache_render_target->GetBitmap(&pBitmap);
-    if (pBitmap != nullptr) {
-        render_target->DrawBitmap(pBitmap, D2D1::RectF(0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)));
-        pBitmap->Release();
-    }
-
-    // Draw pressed state over buttons that are pressed
-    for (size_t i = 0; i < buttons.size(); ++i) {
-        if (overlay_button_states[i]) {
-            D2D1_RECT_F rect = D2D1::RectF(
-                static_cast<float>(buttons[i].left),
-                static_cast<float>(buttons[i].top),
-                static_cast<float>(buttons[i].right),
-                static_cast<float>(buttons[i].bottom)
-            );
-            render_target->FillRectangle(rect, brush_pressed);
-        }
-    }
-
-    render_target->EndDraw();
 }

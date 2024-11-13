@@ -1,5 +1,6 @@
 #pragma once
 
+#include "globals.h"
 #include "smx/smx_wrapper.h"
 #include "spiceapi/wrappers.h"
 #include <array>
@@ -22,9 +23,6 @@ using namespace std;
 
 // Macro for finding the `i`th bit in an integer, used for reading panel values from the SMX SDK stage states
 #define BIT(value, i) (((value) >> (i)) & 1)
-
-// Reference to the button states defined and managed by the touch overlay
-extern map<int, bool> overlay_button_states;
 
 class InputUtils {
 public:
