@@ -25,6 +25,9 @@ using namespace spiceapi;
 using namespace std;
 
 // Forward function declarations
+void CreateOverlayWindow(HINSTANCE h_instance, int cmd_show);
+void InitializeTimers();
+void CleanupTimers();
 void HandleWindowPress(int x, int y, bool pressed);
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void SmxOnLog(const char* log);
@@ -62,7 +65,7 @@ static UINT redraw_timer_id;
 static UINT window_position_timer_id;
 
 // Program entrypoint
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
     // Create a console window we can use for logging
     if (AllocConsole()) {
         FILE* fp;
@@ -91,6 +94,37 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     printf("Connected to SpiceAPI successfully\n");
     is_connected = true;
 
+    // Create the actual overlay window and initialize Direct2D drawing
+    CreateOverlayWindow(h_instance, cmd_show);
+
+    // Initialize the timers that drive our IO, draw calls, etc.
+    InitializeTimers();
+
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0) && is_connected) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // Spice API is no longer connected, clean up and shut down
+    printf("Lost connection to SpiceAPI, exiting\n");
+
+    // Clean up the timers we created
+    CleanupTimers();
+    // Deregister the window for touch events
+    UnregisterTouchWindow(hwnd);
+    // Cleanup the touch overlay and release the Direct2D objects
+    CleanupTouchOverlay();
+    // Kill the SMX SDK
+    smx.SMX_Stop();
+    // Free the console window we allocated
+    FreeConsole();
+
+    return 0;
+}
+
+// Creates the overlay window and initializes the Direct2D contexts
+void CreateOverlayWindow(HINSTANCE hInstance, int nCmdShow) {
     // Setup the actual overlay window, now that SpiceAPI is connected
     WNDCLASS wc = {};
     wc.lpfnWndProc = WndProc;
@@ -128,7 +162,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     // Initialize Direct2D and create the touch overlay elements
     InitializeTouchOverlay();
+}
 
+// Initialize all of our system timers for various IO tasks
+void InitializeTimers() {
     // Set system media timer resolution to 1 ms, so we can have accurate timers for inputs and outputs
     timeBeginPeriod(1);
 
@@ -142,17 +179,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     redraw_timer_id = timeSetEvent(kFramerateIntervalMs, 1, RedrawTimerCallback, 0, TIME_PERIODIC);
     // Start a 5 second timer to make sure the window is always repositioned on top
     window_position_timer_id = timeSetEvent(kSetWindowPosIntervalMs, 1, WindowPosTimerCallback, 0, TIME_PERIODIC);
+} 
 
-    MSG msg = {};
-    while (GetMessage(&msg, NULL, 0, 0) && is_connected) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-
-    // Spice API is no longer connected, clean up and shut down
-    printf("Lost connection to SpiceAPI, exiting\n");
-
-    // Kill the timers (we have 2 media timers for managing IO, and 3 window timers for managing overlay redraws/positioning, and connectivity checks)
+// Kills our timers and cleans up the timer resolution settings
+void CleanupTimers() {
+    // Kill the timers
     timeKillEvent(lights_timer_id);
     timeKillEvent(stage_input_timer_id);
     timeKillEvent(connection_check_timer_id);
@@ -160,16 +191,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     timeKillEvent(window_position_timer_id);
     // Reset the timer resolution period
     timeEndPeriod(1);
-    // Deregister the window for touch events
-    UnregisterTouchWindow(hwnd);
-    // Cleanup the touch overlay and release the Direct2D objects
-    CleanupTouchOverlay();
-    // Kill the SMX SDK
-    smx.SMX_Stop();
-    // Free the console window we allocated
-    FreeConsole();
-
-    return 0;
 }
 
 // Handles a window press, either from a touchscreen or from a mouse, and presses the appropriate
