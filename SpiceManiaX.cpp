@@ -21,10 +21,13 @@
 using namespace spiceapi;
 using namespace std;
 
-// We output the overlay every 33ms (30fps)
+// Timer interval for how often we update the overlay graphics (30fps)
 const int FRAME_RATE_INTERVAL_MS = 33;
-// We reposition the window every 3 seconds, to make sure it comes back
-// into view if DDR starts after the overlay is spawned
+// Timer interval for when to update the lights on the cabinet (30Hz)
+const int LIGHTS_OUTPUT_INTERVAL_MS = 33;
+// Timer interval for when to send the inputs from the stage and overlay (1000Hz)
+const int INPUTS_UPDATE_INTERVAL_MS = 1;
+// We reposition the window every 3 seconds, to make sure it always sits on top of DDR after it goes fullscreen
 const int SET_WINDOW_POS_INTERVAL_MS = 5000;
 // We check for SpiceAPI connections during runtime every 3 seconds
 const int CONNECTION_CHECK_INTERVAL_MS = 1000;
@@ -42,11 +45,16 @@ void smx_on_log(const char* log);
 void wait_for_connection();
 void CALLBACK lights_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
 void CALLBACK stage_input_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK connectivity_check_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK redraw_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK window_pos_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
 void initialize_direct2d(HWND hwnd);
 void cleanup_direct2d();
 void draw_buttons();
 void draw_buttons_to_cache();
 
+// Reference to the main window, once it's created
+HWND hwnd;
 // Our connection object for communication with SpiceAPI
 Connection con("localhost", 1337, "spicemaniax");
 // Util class for handling lights interactions (reading lights from SpiceAPI, outputting via SMX SDK)
@@ -59,6 +67,12 @@ bool is_connected = false;
 UINT lights_timer_id;
 // Media Timer ID for the stage inputs timer
 UINT stage_input_timer_id;
+// Media Timer ID for checking Spice API connectivity
+UINT connection_check_timer_id;
+// Media Timer ID for redrawing the overlay
+UINT redraw_timer_id;
+// Media Timer ID for updating the window position
+UINT window_position_timer_id;
 
 // Global variables for Direct2D setup and contexts
 HINSTANCE h_inst;
@@ -99,15 +113,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     printf("Connected to SpiceAPI successfully\n");
     is_connected = true;
 
-    // Set system timer resolution to 1 ms, so we can have accurate timers for inputs and outputs
-    timeBeginPeriod(1);
-
-    // Start a 33ms timer, so we can output lights at 30Hz
-    lights_timer_id = timeSetEvent(33, 1, lights_timer_callback, 0, TIME_PERIODIC);
-    // Start a 1ms timer, so we can send stage inputs at 1000Hz
-    stage_input_timer_id = timeSetEvent(1, 1, stage_input_timer_callback, 0, TIME_PERIODIC);
-
-    // Setup the actual overlay window, now thw SpiceAPI is connected
+    // Setup the actual overlay window, now that SpiceAPI is connected
     h_inst = hInstance;
     WNDCLASS wc = {};
     wc.lpfnWndProc = wnd_proc;
@@ -117,7 +123,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     RegisterClass(&wc);
 
-    HWND hwnd = CreateWindowEx(
+    hwnd = CreateWindowEx(
         WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_APPWINDOW,
         wc.lpszClassName,
         L"SpiceManiaX Overlay",
@@ -155,12 +161,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Initialize Direct2D
     initialize_direct2d(hwnd);
 
-    // Set a timer to trigger redraws at 30fps
-    SetTimer(hwnd, 1, FRAME_RATE_INTERVAL_MS, NULL);
-    // Set a timer every 5 seconds to make sure the window is always repositioned on top
-    SetTimer(hwnd, 2, SET_WINDOW_POS_INTERVAL_MS, NULL);
-    // Set a timer every 3 seconds to check for SpiceAPI connectivity
-    SetTimer(hwnd, 3, CONNECTION_CHECK_INTERVAL_MS, NULL);
+    // Set system media timer resolution to 1 ms, so we can have accurate timers for inputs and outputs
+    timeBeginPeriod(1);
+
+    // Start a 33ms timer, so we can output lights at 30Hz
+    lights_timer_id = timeSetEvent(LIGHTS_OUTPUT_INTERVAL_MS, 1, lights_timer_callback, 0, TIME_PERIODIC);
+    // Start a 1ms timer, so we can send stage inputs at 1000Hz
+    stage_input_timer_id = timeSetEvent(INPUTS_UPDATE_INTERVAL_MS, 1, stage_input_timer_callback, 0, TIME_PERIODIC);
+    // Start a 3 second timer which polls for SpiceAPI connectivity
+    connection_check_timer_id = timeSetEvent(CONNECTION_CHECK_INTERVAL_MS, 1, connectivity_check_timer_callback, 0, TIME_PERIODIC);
+    // Start a 33ms timer for triggering overlay redraws
+    redraw_timer_id = timeSetEvent(FRAME_RATE_INTERVAL_MS, 1, redraw_timer_callback, 0, TIME_PERIODIC);
+    // Start a 5 second timer to make sure the window is always repositioned on top
+    window_position_timer_id = timeSetEvent(SET_WINDOW_POS_INTERVAL_MS, 1, window_pos_timer_callback, 0, TIME_PERIODIC);
 
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0) && is_connected) {
@@ -174,9 +187,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Kill the timers (we have 2 media timers for managing IO, and 3 window timers for managing overlay redraws/positioning, and connectivity checks)
     timeKillEvent(lights_timer_id);
     timeKillEvent(stage_input_timer_id);
-    KillTimer(hwnd, 1);
-    KillTimer(hwnd, 2);
-    KillTimer(hwnd, 3);
+    timeKillEvent(connection_check_timer_id);
+    timeKillEvent(redraw_timer_id);
+    timeKillEvent(window_position_timer_id);
     // Reset the timer resolution period
     timeEndPeriod(1);
     // Cleanup the Direct2D contexts
@@ -194,20 +207,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 // Handler for incoming Windows messages to the overlay window
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
     switch (msg) {
-    case WM_TIMER:
-        // One of our Windows timers is being invoked, determine which one and act
-        if (w_param == 1) {
-            // Redraw logic for 33ms timer
-            InvalidateRect(hwnd, NULL, FALSE);
-        } else if (w_param == 2) {
-            // Periodically set the window to the topmost position, to handle the game starting
-            // and taking over the screen
-            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, DDR_SCREEN_W, DDR_SCREEN_H, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
-        } else if (w_param == 3) {
-            // Periodically check the SpiceAPI connection, so we can auto exit when it's lost
-            is_connected = con.check();
-        }
-        break;
     case WM_PAINT:
         // Message signalling to redraw the screen
         PAINTSTRUCT ps;
@@ -240,9 +239,9 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
                 // Check which buttons the touches are in bounds for
                 for (size_t j = 0; j < buttons.size(); ++j) {
                     if (PtInRect(&buttons[j], POINT{ x, y })) {
-                        if ((touches[i].dwFlags & TOUCHEVENTF_DOWN) && !overlay_button_states[j]) {
+                        if ((touches[i].dwFlags & TOUCHEVENTF_DOWN)) {
                             overlay_button_states[j] = true;
-                        } else if ((touches[i].dwFlags & TOUCHEVENTF_UP) && overlay_button_states[j]) {
+                        } else if ((touches[i].dwFlags & TOUCHEVENTF_UP)) {
                             overlay_button_states[j] = false;
                         }
                     }
@@ -294,6 +293,21 @@ void CALLBACK lights_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR)
 // Callback for the 1ms timer we set for the stage inputs, to always output at 1000Hz
 void CALLBACK stage_input_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
     stage_input_utils.perform_input_tasks(con);
+}
+
+// Callback for the timer which triggers a SpiceAPI connectivity check
+void CALLBACK connectivity_check_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+    is_connected = con.check();
+}
+
+// Callback for the timer which triggers an overlay redraw
+void CALLBACK redraw_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+    InvalidateRect(hwnd, NULL, FALSE);
+}
+
+// Callback for the timer which triggers the window to reposition itself on top of everything else
+void CALLBACK window_pos_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, DDR_SCREEN_W, DDR_SCREEN_H, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 }
 
 void initialize_direct2d(HWND hwnd) {
