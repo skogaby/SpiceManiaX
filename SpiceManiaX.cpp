@@ -22,36 +22,36 @@ using namespace spiceapi;
 using namespace std;
 
 // Timer interval for how often we update the overlay graphics (30fps)
-const int FRAME_RATE_INTERVAL_MS = 33;
+const int kFramerateIntervalMs = 33;
 // Timer interval for when to update the lights on the cabinet (30Hz)
-const int LIGHTS_OUTPUT_INTERVAL_MS = 33;
+const int kLightsOutputIntervalMs = 33;
 // Timer interval for when to send the inputs from the stage and overlay (1000Hz)
-const int INPUTS_UPDATE_INTERVAL_MS = 1;
+const int kInputsUpdateIntervalMs = 1;
 // We reposition the window every 3 seconds, to make sure it always sits on top of DDR after it goes fullscreen
-const int SET_WINDOW_POS_INTERVAL_MS = 5000;
+const int kSetWindowPosIntervalMs = 5000;
 // We check for SpiceAPI connections during runtime every 3 seconds
-const int CONNECTION_CHECK_INTERVAL_MS = 1000;
+const int kConnectionCheckIntervalMs = 1000;
 // Fullscreen width when DDR is running
-const int DDR_SCREEN_W = 1280;
+const int kDdrScreenWidth = 1280;
 // Fullscreen height when DDR is running
-const int DDR_SCREEN_H = 720;
+const int kDdrScreenHeight = 720;
 // TODO: Remove these
-const int BUTTON_WIDTH = 100;
-const int BUTTON_HEIGHT = 50;
+const int kButtonWidth = 100;
+const int kButtonHeight = 50;
 
 // Forward function declarations
-LRESULT CALLBACK wnd_proc(HWND, UINT, WPARAM, LPARAM);
-void smx_on_log(const char* log);
-void wait_for_connection();
-void CALLBACK lights_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void CALLBACK stage_input_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void CALLBACK connectivity_check_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void CALLBACK redraw_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void CALLBACK window_pos_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void initialize_direct2d(HWND hwnd);
-void cleanup_direct2d();
-void draw_buttons();
-void draw_buttons_to_cache();
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void SmxOnLog(const char* log);
+void WaitForConnection();
+void CALLBACK LightsTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK InputTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK RedrawTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void InitializeDirect2D(HWND hwnd);
+void CleanupDirect2D();
+void DrawButtons();
+void DrawButtonsToCache();
 
 // Reference to the main window, once it's created
 HWND hwnd;
@@ -60,7 +60,7 @@ Connection con("localhost", 1337, "spicemaniax");
 // Util class for handling lights interactions (reading lights from SpiceAPI, outputting via SMX SDK)
 LightsUtils lights_util;
 // Util class for handling stage input ineractions (read stage inputs when the state changes, output via SpiceAPI)
-InputUtils stage_input_utils;
+InputUtils input_utils;
 // Flag for whether SpiceAPI is connected or not
 bool is_connected = false;
 // Media Timer ID for the lights timer
@@ -95,10 +95,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     // Set the logging callback before we init the SDK
     SMXWrapper& smx = SMXWrapper::getInstance();
-    smx.SMX_SetLogCallback(smx_on_log);
+    smx.SMX_SetLogCallback(SmxOnLog);
 
     // Initialize the SMX SDK, which handles device connections for us
-    smx.SMX_Start(InputUtils::SMXStateChangedCallback, static_cast<void*>(&stage_input_utils));
+    smx.SMX_Start(InputUtils::SMXStateChangedCallback, static_cast<void*>(&input_utils));
 
     if (!smx.loaded) {
         printf("Unable to load StepManiaX SDK, exiting");
@@ -108,7 +108,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     printf("Loaded SMX.dll successfully, attempting to connect to SpiceAPI now\n");
 
     // Connect to SpiceAPI, retry until it's successful
-    wait_for_connection();
+    WaitForConnection();
 
     printf("Connected to SpiceAPI successfully\n");
     is_connected = true;
@@ -116,7 +116,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Setup the actual overlay window, now that SpiceAPI is connected
     h_inst = hInstance;
     WNDCLASS wc = {};
-    wc.lpfnWndProc = wnd_proc;
+    wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = L"OverlayWindowClass";
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -128,7 +128,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         wc.lpszClassName,
         L"SpiceManiaX Overlay",
         WS_POPUP | WS_VISIBLE,
-        0, 0, DDR_SCREEN_W, DDR_SCREEN_H,
+        0, 0, kDdrScreenWidth, kDdrScreenHeight,
         NULL, NULL, hInstance, NULL
     );
 
@@ -136,7 +136,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
     SetWindowLongPtr(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
     SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_NOACTIVATE);
-    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, DDR_SCREEN_W, DDR_SCREEN_H, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kDdrScreenWidth, kDdrScreenHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 
     // Disable visual feedback for touch inputs
     BOOL feedbackEnabled = FALSE;
@@ -147,8 +147,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     ShowWindow(hwnd, nCmdShow);
 
     // Define button positions
-    buttons.push_back({ 100, 100, 100 + BUTTON_WIDTH, 100 + BUTTON_HEIGHT });
-    buttons.push_back({ 300, 100, 300 + BUTTON_WIDTH, 100 + BUTTON_HEIGHT });
+    buttons.push_back({ 100, 100, 100 + kButtonWidth, 100 + kButtonHeight });
+    buttons.push_back({ 300, 100, 300 + kButtonWidth, 100 + kButtonHeight });
 
     // Initialize button states
     for (size_t i = 0; i < buttons.size(); ++i) {
@@ -159,21 +159,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     RegisterTouchWindow(hwnd, 0);
 
     // Initialize Direct2D
-    initialize_direct2d(hwnd);
+    InitializeDirect2D(hwnd);
 
     // Set system media timer resolution to 1 ms, so we can have accurate timers for inputs and outputs
     timeBeginPeriod(1);
 
     // Start a 33ms timer, so we can output lights at 30Hz
-    lights_timer_id = timeSetEvent(LIGHTS_OUTPUT_INTERVAL_MS, 1, lights_timer_callback, 0, TIME_PERIODIC);
+    lights_timer_id = timeSetEvent(kLightsOutputIntervalMs, 1, LightsTimerCallback, 0, TIME_PERIODIC);
     // Start a 1ms timer, so we can send stage inputs at 1000Hz
-    stage_input_timer_id = timeSetEvent(INPUTS_UPDATE_INTERVAL_MS, 1, stage_input_timer_callback, 0, TIME_PERIODIC);
+    stage_input_timer_id = timeSetEvent(kInputsUpdateIntervalMs, 1, InputTimerCallback, 0, TIME_PERIODIC);
     // Start a 3 second timer which polls for SpiceAPI connectivity
-    connection_check_timer_id = timeSetEvent(CONNECTION_CHECK_INTERVAL_MS, 1, connectivity_check_timer_callback, 0, TIME_PERIODIC);
+    connection_check_timer_id = timeSetEvent(kConnectionCheckIntervalMs, 1, ConnectivityCheckTimerCallback, 0, TIME_PERIODIC);
     // Start a 33ms timer for triggering overlay redraws
-    redraw_timer_id = timeSetEvent(FRAME_RATE_INTERVAL_MS, 1, redraw_timer_callback, 0, TIME_PERIODIC);
+    redraw_timer_id = timeSetEvent(kFramerateIntervalMs, 1, RedrawTimerCallback, 0, TIME_PERIODIC);
     // Start a 5 second timer to make sure the window is always repositioned on top
-    window_position_timer_id = timeSetEvent(SET_WINDOW_POS_INTERVAL_MS, 1, window_pos_timer_callback, 0, TIME_PERIODIC);
+    window_position_timer_id = timeSetEvent(kSetWindowPosIntervalMs, 1, WindowPosTimerCallback, 0, TIME_PERIODIC);
 
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0) && is_connected) {
@@ -193,7 +193,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Reset the timer resolution period
     timeEndPeriod(1);
     // Cleanup the Direct2D contexts
-    cleanup_direct2d();
+    CleanupDirect2D();
     // Deregister the window for touch events
     UnregisterTouchWindow(hwnd);
     // Free the console window we allocated
@@ -205,13 +205,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 }
 
 // Handler for incoming Windows messages to the overlay window
-LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
     switch (msg) {
     case WM_PAINT:
         // Message signalling to redraw the screen
         PAINTSTRUCT ps;
         BeginPaint(hwnd, &ps);
-        draw_buttons();
+        DrawButtons();
         EndPaint(hwnd, &ps);
         break;
     case WM_TOUCH: {
@@ -231,9 +231,9 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
                 int screen_w = GetSystemMetrics(SM_CXSCREEN);
                 int screen_h = GetSystemMetrics(SM_CYSCREEN);
 
-                if (screen_w != DDR_SCREEN_W || screen_h != DDR_SCREEN_H) {
-                    x = map_value(x, 0, screen_w, 0, DDR_SCREEN_W);
-                    y = map_value(y, 0, screen_h, 0, DDR_SCREEN_H);
+                if (screen_w != kDdrScreenWidth || screen_h != kDdrScreenHeight) {
+                    x = MapValue(x, 0, screen_w, 0, kDdrScreenWidth);
+                    y = MapValue(y, 0, screen_h, 0, kDdrScreenHeight);
                 }
 
                 // Check which buttons the touches are in bounds for
@@ -270,12 +270,12 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
 
 
 // Logging callback for the StepManiaX SDK
-void smx_on_log(const char* log) {
+void SmxOnLog(const char* log) {
     printf("[SMX] %s\n", log);
 }
 
 // Checks for the SpiceAPI connection, and waits for it to be available if it's not
-void wait_for_connection() {
+void WaitForConnection() {
     if (!con.check()) {
         printf("Unable to connect to SpiceAPI, waiting until connection is successful\n");
         while (!con.check()) {
@@ -286,31 +286,31 @@ void wait_for_connection() {
 }
 
 // Callback for the 33ms timer we set for the lights, to always output at 30Hz
-void CALLBACK lights_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    lights_util.perform_lights_tasks(con);
+void CALLBACK LightsTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+    lights_util.PerformLightsTasks(con);
 }
 
 // Callback for the 1ms timer we set for the stage inputs, to always output at 1000Hz
-void CALLBACK stage_input_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    stage_input_utils.perform_input_tasks(con);
+void CALLBACK InputTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+    input_utils.PerformInputTasks(con);
 }
 
 // Callback for the timer which triggers a SpiceAPI connectivity check
-void CALLBACK connectivity_check_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
     is_connected = con.check();
 }
 
 // Callback for the timer which triggers an overlay redraw
-void CALLBACK redraw_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+void CALLBACK RedrawTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
     InvalidateRect(hwnd, NULL, FALSE);
 }
 
 // Callback for the timer which triggers the window to reposition itself on top of everything else
-void CALLBACK window_pos_timer_callback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, DDR_SCREEN_W, DDR_SCREEN_H, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
+void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kDdrScreenWidth, kDdrScreenHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 }
 
-void initialize_direct2d(HWND hwnd) {
+void InitializeDirect2D(HWND hwnd) {
     // Initialize the Direct2D Factory
     D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d_factory);
 
@@ -332,11 +332,11 @@ void initialize_direct2d(HWND hwnd) {
 
     // Draw static content (buttons in normal state) to the off-screen render target
     cache_render_target->BeginDraw();
-    draw_buttons_to_cache();
+    DrawButtonsToCache();
     cache_render_target->EndDraw();
 }
 
-void cleanup_direct2d() {
+void CleanupDirect2D() {
     if (brush_normal) brush_normal->Release();
     if (brush_pressed) brush_pressed->Release();
     if (cache_render_target) cache_render_target->Release();
@@ -344,7 +344,7 @@ void cleanup_direct2d() {
     if (d2d_factory) d2d_factory->Release();
 }
 
-void draw_buttons_to_cache() {
+void DrawButtonsToCache() {
     // Draw static button backgrounds to the off-screen render target
     for (const auto& button : buttons) {
         D2D1_RECT_F rect = D2D1::RectF(
@@ -357,7 +357,7 @@ void draw_buttons_to_cache() {
     }
 }
 
-void draw_buttons() {
+void DrawButtons() {
     if (!render_target) return;
 
     render_target->BeginDraw();

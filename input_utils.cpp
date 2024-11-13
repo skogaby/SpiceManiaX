@@ -1,6 +1,6 @@
 #include "input_utils.h"
 
-const string InputUtils::input_names[2][4] = {
+const string InputUtils::kInputNames[2][4] = {
     { "P1 Panel Up", "P1 Panel Down", "P1 Panel Left", "P1 Panel Right" },
     { "P2 Panel Up", "P2 Panel Down", "P2 Panel Left", "P2 Panel Right" },
 };
@@ -9,17 +9,17 @@ const string InputUtils::input_names[2][4] = {
 // callback with our internal logic, due to how the callback has to be registered and because we store the input
 // as a member variable.
 void InputUtils::SMXStateChangedCallback(int pad, SMXUpdateCallbackReason reason, void* pUser) {
-    InputUtils* pSelf = (InputUtils*)pUser;
-    pSelf->smx_on_state_changed(pad);
+    InputUtils* pSelf = (InputUtils*) pUser;
+    pSelf->SmxOnStateChanged(pad);
 }
 
-void InputUtils::smx_on_state_changed(int pad) {
+void InputUtils::SmxOnStateChanged(int pad) {
     // Get the input state (for some reason the callback does not include it as a parameter...)
-    pad_input_states[pad] = SMXWrapper::getInstance().SMX_GetInputState(pad);
+    pad_input_states_[pad] = SMXWrapper::getInstance().SMX_GetInputState(pad);
 }
 
 // Main function for sending inputs to SpiceAPI
-void InputUtils::perform_input_tasks(Connection& con) {
+void InputUtils::PerformInputTasks(Connection& con) {
     // Send a SpiceAPI update with all our button values
     vector<ButtonState> button_states;
 
@@ -27,8 +27,8 @@ void InputUtils::perform_input_tasks(Connection& con) {
     for (size_t player = 0; player < 2; player++) {
         for (size_t panel = 0; panel < 4; panel++) {
             ButtonState state;
-            state.name = input_names[player][panel];
-            state.value = (float) BIT(pad_input_states[player], panel_indices[panel]);
+            state.name = kInputNames[player][panel];
+            state.value = (float) BIT(pad_input_states_[player], kPanelIndices[panel]);
             button_states.push_back(state);
         }
     }
@@ -41,7 +41,7 @@ void InputUtils::perform_input_tasks(Connection& con) {
         state.name = names[button];
         state.value = overlay_button_states[button] ? 1.0f : 0.0f;
         button_states.push_back(state);
-    }
+    } 
 
     buttons_write(con, button_states);
 }

@@ -20,24 +20,26 @@ using namespace std;
 #define DOWN 7
 #define DOWN_RIGHT 8
 
+// Macro for finding the `i`th bit in an integer, used for reading panel values from the SMX SDK stage states
 #define BIT(value, i) (((value) >> (i)) & 1)
 
+// Reference to the button states defined and managed by the touch overlay
 extern map<int, bool> overlay_button_states;
 
 class InputUtils {
 public:
     static void SMXStateChangedCallback(int pad, SMXUpdateCallbackReason reason, void* pUser);
-    void perform_input_tasks(Connection& con);
+    void PerformInputTasks(Connection& con);
 
 private:
-    void smx_on_state_changed(int pad);
+    void SmxOnStateChanged(int pad);
 
     // Buffer to hold our input states
-    array<uint16_t, 2> pad_input_states;
+    array<uint16_t, 2> pad_input_states_;
 
     // The input names that SpiceAPI expects for each panel
-    static const string input_names[2][4];
+    static const string kInputNames[2][4];
     // The StepManiaX panel indices which correspond to the panel at the same index
     // in `input_names` above.
-    static constexpr size_t panel_indices[4] = { 1, 7, 3, 5 };
+    static constexpr size_t kPanelIndices[4] = { 1, 7, 3, 5 };
 };

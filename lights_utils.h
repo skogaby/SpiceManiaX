@@ -10,26 +10,26 @@
 #define POLL_LIGHTS true
 #define OUTPUT_LIGHTS true
 
-// Hardcode the color of the pads, for the center panel and the corner panels (besides
-// the portion emulating the corner lights)
-#define PAD_R 0xBB
-#define PAD_G 0xBB
-#define PAD_B 0x00
-
-// LED counts for various SMX devices
-#define SMX_ARROW_LED_COUNT 25
-#define SMX_MARQUEE_LOGICAL_LED_COUNT 24
-#define SMX_MARQUEE_PHYSICAL_LED_COUNT 12
-#define SMX_VERTICAL_STRIP_LED_COUNT 28
-#define SMX_SPOTLIGHT_LED_COUNT 8
-
-// LED counts for various DDR devices
-#define DDR_ARROW_LED_COUNT 25
-#define DDR_TOP_PANEL_LED_COUNT 40
-#define DDR_VERTICAL_STRIP_LED_COUNT 25
-
 using namespace spiceapi;
 using namespace std;
+
+// Hardcode the color of the pads, for the center panel and the corner panels (besides
+// the portion emulating the corner lights)
+const uint8_t kPadRed = 0xBB;
+const uint8_t kPadGreen = 0xBB;
+const uint8_t kPadBlue = 0x00;
+
+// LED counts for various SMX devices
+const size_t kSmxArrowLedCount = 25;
+const size_t kSmxMarqueeLogicalLedCount = 24;
+const size_t kSmxMarqueePhysicalLedCount = 12;
+const size_t kSmxVerticalStripLedCount = 28;
+const size_t kSmxSpotlightLedCount = 8;
+
+// LED counts for various DDR devices
+const size_t kDdrArrowLedCount = 25;
+const size_t kDdrTopPanelLedCount = 40;
+const size_t kDdrVerticalStripLedCount = 25;
 
 /*
     Utility class for handling lights output. It basically just exposes a single function to
@@ -38,23 +38,23 @@ using namespace std;
 */
 class LightsUtils {
 public:
-    void perform_lights_tasks(Connection& con);
+    void PerformLightsTasks(Connection& con);
 private:
-    void handle_stage_lights_update();
-    void handle_marquee_lights_update();
-    void handle_vertical_strip_lights_update();
-    void handle_spotlight_lights_update();
-    void handle_arrow_panel_light(string& light_data, size_t pad, size_t panel_index);
-    void handle_corner_panel_light(string& light_data, size_t pad, size_t panel_index);
-    void fill_stage_panel_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
-    void add_color(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
-    int map_value(int x, int in_min, int in_max, int out_min, int out_max);
-    uint8_t average(uint8_t a, uint8_t b);
+    void HandleStageLightsUpdate();
+    void HandleMarqueeLightsUpdate();
+    void HandleVerticalStripLightsUpdate();
+    void HandleSpotlightLightsUpdate();
+    void HandleArrowPanelLight(string& light_data, size_t pad, size_t panel_index);
+    void HandleCornerPanelLight(string& light_data, size_t pad, size_t panel_index);
+    void FillStagePanelColor(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
+    void AddColor(string& lights_data, uint8_t red, uint8_t green, uint8_t blue);
+    int MapValue(int x, int in_min, int in_max, int out_min, int out_max);
+    uint8_t Average(uint8_t a, uint8_t b);
 
     // The storage for the incoming lights states from Spice API when we call lights::read
-    map<string, float> light_states;
+    map<string, float> light_states_;
     // The storage for the incoming tape LED states from Spice API when we call ddr:tapeled_get
-    map<string, vector<uint8_t>> tape_led_states;
+    map<string, vector<uint8_t>> tape_led_states_;
 
     /*
         These are just static sets of flags for whether a particular LED is on or off in the outer 4x4
@@ -64,7 +64,7 @@ private:
         we're simulating an L-shape.
     */
     // Pad upper-left
-    static constexpr uint8_t pad_upper_left_leds[4][4] = {
+    static constexpr uint8_t kPadUpperLeftLeds[4][4] = {
         { 1, 1, 1, 1 },
         { 1, 0, 0, 0 },
         { 1, 0, 0, 0 },
@@ -72,7 +72,7 @@ private:
     };
 
     // Pad lower-left
-    static constexpr uint8_t pad_lower_left_leds[4][4] = {
+    static constexpr uint8_t kPadLowerLeftLeds[4][4] = {
         { 1, 0, 0, 0 },
         { 1, 0, 0, 0 },
         { 1, 0, 0, 0 },
@@ -80,7 +80,7 @@ private:
     };
 
     // Pad upper-right
-    static constexpr uint8_t pad_upper_right_leds[4][4] = {
+    static constexpr uint8_t kPadUpperRightLeds[4][4] = {
         { 1, 1, 1, 1 },
         { 0, 0, 0, 1 },
         { 0, 0, 0, 1 },
@@ -88,7 +88,7 @@ private:
     };
 
     // Pad lower-right
-    static constexpr uint8_t pad_lower_right_leds[4][4] = {
+    static constexpr uint8_t kPadLowerRightLeds[4][4] = {
         { 0, 0, 0, 1 },
         { 0, 0, 0, 1 },
         { 0, 0, 0, 1 },
