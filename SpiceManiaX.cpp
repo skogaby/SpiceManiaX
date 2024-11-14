@@ -10,7 +10,6 @@
 #include <d2d1.h>
 #include <mmsystem.h>
 #include <windows.h>
-#include <windowsx.h>
 #include <winuser.h>
 #include <iostream>
 #include <sstream>
@@ -25,11 +24,8 @@ using namespace spiceapi;
 using namespace std;
 
 // Forward function declarations
-void CreateOverlayWindow(HINSTANCE h_instance, int cmd_show);
 void InitializeTimers();
 void CleanupTimers();
-void HandleWindowPress(int x, int y, bool pressed);
-LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void SmxOnLog(const char* log);
 void WaitForConnection();
 void CALLBACK LightsTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
@@ -122,47 +118,6 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
     return 0;
 }
 
-// Creates the overlay window and initializes the Direct2D contexts
-void CreateOverlayWindow(HINSTANCE hInstance, int nCmdShow) {
-    // Setup the actual overlay window, now that SpiceAPI is connected
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = WndProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = L"OverlayWindowClass";
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-
-    RegisterClass(&wc);
-
-    hwnd = CreateWindowEx(
-        WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_APPWINDOW,
-        wc.lpszClassName,
-        L"SpiceManiaX Overlay",
-        WS_POPUP | WS_VISIBLE,
-        0, 0, kWindowRenderWidth, kWindowRenderHeight,
-        NULL, NULL, hInstance, NULL
-    );
-
-    // Set the window styling so it's transparent, borderless, and always on top
-    SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
-    SetWindowLongPtr(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-    SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_NOACTIVATE);
-    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kWindowRenderWidth, kWindowRenderHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
-
-    // Disable visual feedback for touch inputs
-    BOOL feedbackEnabled = FALSE;
-    SystemParametersInfo(SPI_SETTOUCHPREDICTIONPARAMETERS, 0, &feedbackEnabled, SPIF_SENDCHANGE);
-    SystemParametersInfo(SPI_SETCONTACTVISUALIZATION, 0, NULL, SPIF_SENDCHANGE);
-
-    // Actually show the overlay window
-    ShowWindow(hwnd, nCmdShow);
-
-    // Enable touch input
-    RegisterTouchWindow(hwnd, 0);
-
-    // Initialize Direct2D and create the touch overlay elements
-    InitializeTouchOverlay();
-}
-
 // Initialize all of our system timers for various IO tasks
 void InitializeTimers() {
     // Set system media timer resolution to 1 ms, so we can have accurate timers for inputs and outputs
@@ -190,79 +145,6 @@ void CleanupTimers() {
     timeKillEvent(window_position_timer_id);
     // Reset the timer resolution period
     timeEndPeriod(1);
-}
-
-// Handles a window press, either from a touchscreen or from a mouse, and presses the appropriate
-// Overlay button
-void HandleWindowPress(int x, int y, bool pressed) {
-    // Check which buttons the touches are in bounds for
-    D2D1_POINT_2F touchPoint = D2D1::Point2F(x, y);
-    for (OverlayButton& button: touch_overlay_buttons) {
-        if (IsTouchInside(button, touchPoint)) {
-            touch_overlay_button_states[button.id_] = pressed;
-            return;
-        }
-    }
-}
-
-// Handler for incoming Windows messages to the overlay window
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
-    switch (msg) {
-    case WM_PAINT:
-        // Message signalling to redraw the screen
-        PAINTSTRUCT ps;
-        BeginPaint(hwnd, &ps);
-        DrawButtons();
-        EndPaint(hwnd, &ps);
-        break;
-    case WM_LBUTTONDOWN:
-    case WM_LBUTTONUP: {
-        // Handle mouse input for remote debugging
-        HandleWindowPress(
-            GET_X_LPARAM(l_param),
-            GET_Y_LPARAM(l_param),
-            (msg == WM_LBUTTONDOWN)
-        );
-
-        break;
-    }
-    case WM_TOUCH: {
-        // Message signalling an incoming touch event on the screen
-        UINT num_inputs = LOWORD(w_param);
-        TOUCHINPUT touches[10];
-
-        if (GetTouchInputInfo((HTOUCHINPUT) l_param, num_inputs, touches, sizeof(TOUCHINPUT))) {
-            for (UINT i = 0; i < num_inputs; i++) {
-                // Convert from 0.01mm to pixels
-                int x = touches[i].x / 100;
-                int y = touches[i].y / 100;
-
-                // Determine if this was a press or not
-                if (touches[i].dwFlags & TOUCHEVENTF_DOWN) {
-                    HandleWindowPress(x, y, true);
-                } else if (touches[i].dwFlags & TOUCHEVENTF_UP) {
-                    HandleWindowPress(x, y, false);
-                }
-            }
-
-            CloseTouchInputHandle((HTOUCHINPUT) l_param);
-        }
-        break;
-    }
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    case WM_KEYDOWN:
-        // Exit the program if the user presses Escape
-        if (w_param == VK_ESCAPE) {
-            PostQuitMessage(0);
-        }
-        break;
-    default:
-        return DefWindowProc(hwnd, msg, w_param, l_param);
-    }
-
-    return 0;
 }
 
 // Logging callback for the StepManiaX SDK

@@ -5,6 +5,7 @@
 
 #include <d2d1.h>
 #include <windows.h>
+#include <windowsx.h>
 #include <winuser.h>
 #include <iostream>
 #include <sstream>
@@ -17,12 +18,16 @@ using namespace std;
 struct OverlayButton;
 void CALLBACK RedrawTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
 void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-bool IsTouchInside(OverlayButton& button, D2D1_POINT_2F& point);
+void CreateOverlayWindow(HINSTANCE h_instance, int cmd_show);
 void InitializeTouchOverlay();
+void SetupOverlayButtons();
+void RenderTouchOverlay();
 void CleanupTouchOverlay();
+void HandleWindowPress(int x, int y, bool pressed);
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void DrawSingleButton(OverlayButton& button, ID2D1RenderTarget* render_target, ID2D1SolidColorBrush* brush);
-void DrawButtons();
 void DrawButtonsToCache();
+bool IsTouchInside(OverlayButton& button, D2D1_POINT_2F& point);
 
 // Fullscreen width when DDR is running
 static const int kWindowRenderWidth = 1280;

@@ -26,16 +26,45 @@ void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR
     SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kWindowRenderWidth, kWindowRenderHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 }
 
-// Says whether the given touch point is inside the given button area
-bool IsTouchInside(OverlayButton& button, D2D1_POINT_2F& point) {
-    static D2D1_MATRIX_3X2_F identity = D2D1::Matrix3x2F::Identity();
+// Creates the overlay window and initializes the Direct2D contexts
+void CreateOverlayWindow(HINSTANCE hInstance, int nCmdShow) {
+    // Setup the actual overlay window, now that SpiceAPI is connected
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = L"OverlayWindowClass";
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
-    // The cached geometries for the buttons have a built-in method to determine if a point is contained inside
-    if (button_geometries.count(button.id_) > 0) {
-        BOOL contains = FALSE;
-        button_geometries[button.id_]->FillContainsPoint(point, identity, &contains);
-        return contains;
-    }
+    RegisterClass(&wc);
+
+    hwnd = CreateWindowEx(
+        WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_APPWINDOW,
+        wc.lpszClassName,
+        L"SpiceManiaX Overlay",
+        WS_POPUP | WS_VISIBLE,
+        0, 0, kWindowRenderWidth, kWindowRenderHeight,
+        NULL, NULL, hInstance, NULL
+    );
+
+    // Set the window styling so it's transparent, borderless, and always on top
+    SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+    SetWindowLongPtr(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+    SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_NOACTIVATE);
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kWindowRenderWidth, kWindowRenderHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
+
+    // Disable visual feedback for touch inputs
+    BOOL feedbackEnabled = FALSE;
+    SystemParametersInfo(SPI_SETTOUCHPREDICTIONPARAMETERS, 0, &feedbackEnabled, SPIF_SENDCHANGE);
+    SystemParametersInfo(SPI_SETCONTACTVISUALIZATION, 0, NULL, SPIF_SENDCHANGE);
+
+    // Actually show the overlay window
+    ShowWindow(hwnd, nCmdShow);
+
+    // Enable touch input
+    RegisterTouchWindow(hwnd, 0);
+
+    // Initialize Direct2D and create the touch overlay elements
+    InitializeTouchOverlay();
 }
 
 // Initializes the Direct2D contexts, render targets, etc. and sets up the cached button rendering
@@ -58,34 +87,8 @@ void InitializeTouchOverlay() {
     render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::CornflowerBlue), &brush_normal);
     render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Red), &brush_pressed);
 
-    // Define the P1 menu navigation buttons. All the coordinates are defined pretty jankily, but it is what it is. Everything
-    // is anchored from the position of the P1 Menu Up button.
-    int p1_up_cx = 100;
-    int p1_up_cy = 575;
-    touch_overlay_buttons.push_back({ 0, "P1 Menu Up", "",
-        p1_up_cx, p1_up_cy, kMenuNavButtonWidth, kMenuNavButtonHeight, true });
-    touch_overlay_buttons.push_back({ 1, "P1 Menu Down", "",
-        p1_up_cx, static_cast<int>(p1_up_cy + (kMenuNavButtonHeight * 1.75)), kMenuNavButtonWidth, kMenuNavButtonHeight, true});
-    touch_overlay_buttons.push_back({ 2, "P1 Menu Left", "",
-        p1_up_cx - kMenuNavButtonWidth + 5, static_cast<int>(p1_up_cy + (kMenuNavButtonHeight * (1.75 / 2))), kMenuNavButtonWidth, kMenuNavButtonHeight, true});
-    touch_overlay_buttons.push_back({ 3, "P1 Menu Right", "",
-        p1_up_cx + kMenuNavButtonWidth - 5, static_cast<int>(p1_up_cy + (kMenuNavButtonHeight * (1.75 / 2))), kMenuNavButtonWidth, kMenuNavButtonHeight, true });
-    touch_overlay_buttons.push_back({ 4, "P1 Start", "",
-        p1_up_cx + (kMenuNavButtonWidth * 3), p1_up_cy + kMenuNavButtonHeight, kMenuNavButtonWidth, kMenuNavButtonHeight, false });
-    
-    // Define the P2 menu navigation buttons. Everything is anchored from the position of the P2 Menu Up button.
-    int p2_up_cx = 1080;
-    int p2_up_cy = 575;
-    touch_overlay_buttons.push_back({ 5, "P2 Menu Up", "",
-        p2_up_cx, p2_up_cy, kMenuNavButtonWidth, kMenuNavButtonHeight, true });
-    touch_overlay_buttons.push_back({ 6, "P2 Menu Down", "",
-        p2_up_cx, static_cast<int>(p2_up_cy + (kMenuNavButtonHeight * 1.75)), kMenuNavButtonWidth, kMenuNavButtonHeight, true });
-    touch_overlay_buttons.push_back({ 7, "P2 Menu Left", "",
-        p2_up_cx - kMenuNavButtonWidth + 5, static_cast<int>(p2_up_cy + (kMenuNavButtonHeight * (1.75 / 2))), kMenuNavButtonWidth, kMenuNavButtonHeight, true });
-    touch_overlay_buttons.push_back({ 8, "P2 Menu Right", "",
-        p2_up_cx + kMenuNavButtonWidth - 5, static_cast<int>(p2_up_cy + (kMenuNavButtonHeight * (1.75 / 2))), kMenuNavButtonWidth, kMenuNavButtonHeight, true });
-    touch_overlay_buttons.push_back({ 9, "P2 Start", "",
-        p2_up_cx + (kMenuNavButtonWidth * 3), p2_up_cy + kMenuNavButtonHeight, kMenuNavButtonWidth, kMenuNavButtonHeight, false });
+    // Create all the buttons for the overlay
+    SetupOverlayButtons();
 
     // Initialize button states
     for (OverlayButton& button: touch_overlay_buttons) {
@@ -96,6 +99,70 @@ void InitializeTouchOverlay() {
     cache_render_target->BeginDraw();
     DrawButtonsToCache();
     cache_render_target->EndDraw();
+}
+
+// Sets up the overlay button objects for both players
+void SetupOverlayButtons() {
+    // Define the menu navigation buttons. All the coordinates are defined pretty jankily, but it is what it is. Everything
+    // is anchored from the position of the Menu Up button for each player.
+    static int up_cxs[2] = { 100, 1080 };
+    static int up_cys[2] = { 575, 575 };
+
+    for (int player = 0; player < 2; player++) {
+        int up_cx = up_cxs[player];
+        int up_cy = up_cys[player];
+        int button_index = (player * 100);
+        string player_str = "P" + to_string(player + 1) + " ";
+
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Up", "",
+            up_cx,
+            up_cy,
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true });
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Down", "",
+            up_cx,
+            static_cast<int>(up_cy + (kMenuNavButtonHeight * 1.75)),
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true });
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Left", "",
+            up_cx - kMenuNavButtonWidth + 5,
+            static_cast<int>(up_cy + (kMenuNavButtonHeight * (1.75 / 2))),
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true });
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Right", "",
+            up_cx + kMenuNavButtonWidth - 5,
+            static_cast<int>(up_cy + (kMenuNavButtonHeight * (1.75 / 2))),
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true });
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Start", "",
+            up_cx + (kMenuNavButtonWidth * 3),
+            up_cy + kMenuNavButtonHeight - 5,
+            kMenuNavButtonWidth, kMenuNavButtonHeight, false });
+    }
+}
+
+// Draws the current state of the buttons on top of their cached, unpressed states
+void RenderTouchOverlay() {
+    if (render_target == nullptr)
+        return;
+
+    // Clear with transparent background
+    render_target->BeginDraw();
+    render_target->Clear(D2D1::ColorF(0, 0.0f));
+
+    // Draw cached button backgrounds
+    ID2D1Bitmap* bitmap = nullptr;
+    cache_render_target->GetBitmap(&bitmap);
+
+    if (bitmap != nullptr) {
+        render_target->DrawBitmap(bitmap, D2D1::RectF(0, 0, kWindowRenderWidth, kWindowRenderHeight));
+        bitmap->Release();
+    }
+
+    // Draw pressed state over buttons that are pressed
+    for (OverlayButton& button : touch_overlay_buttons) {
+        if (touch_overlay_button_states[button.id_]) {
+            DrawSingleButton(button, render_target, brush_pressed);
+        }
+    }
+
+    render_target->EndDraw();
 }
 
 // Dispose of the cached D2D objects and free up memory from brushes, render targets, etc.
@@ -112,6 +179,80 @@ void CleanupTouchOverlay() {
             button_geometries[button.id_]->Release();
         }
     }
+}
+
+// Handles a window press, either from a touchscreen or from a mouse, and presses the appropriate
+// Overlay button
+void HandleWindowPress(int x, int y, bool pressed) {
+    // Check which buttons the touches are in bounds for
+    D2D1_POINT_2F touchPoint = D2D1::Point2F(x, y);
+    for (OverlayButton& button : touch_overlay_buttons) {
+        if (IsTouchInside(button, touchPoint)) {
+            touch_overlay_button_states[button.id_] = pressed;
+            return;
+        }
+    }
+}
+
+// Handler for incoming Windows messages to the overlay window
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
+    switch (msg) {
+    case WM_PAINT:
+        // Message signalling to redraw the screen
+        PAINTSTRUCT ps;
+        BeginPaint(hwnd, &ps);
+        RenderTouchOverlay();
+        EndPaint(hwnd, &ps);
+        break;
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONUP: {
+        // Handle mouse input for remote debugging
+        HandleWindowPress(
+            GET_X_LPARAM(l_param),
+            GET_Y_LPARAM(l_param),
+            (msg == WM_LBUTTONDOWN)
+        );
+
+        break;
+    }
+    case WM_TOUCH: {
+        // Message signalling an incoming touch event on the screen
+        UINT num_inputs = LOWORD(w_param);
+        TOUCHINPUT touches[10];
+
+        if (GetTouchInputInfo((HTOUCHINPUT)l_param, num_inputs, touches, sizeof(TOUCHINPUT))) {
+            for (UINT i = 0; i < num_inputs; i++) {
+                // Convert from 0.01mm to pixels
+                int x = touches[i].x / 100;
+                int y = touches[i].y / 100;
+
+                // Determine if this was a press or not
+                if (touches[i].dwFlags & TOUCHEVENTF_DOWN) {
+                    HandleWindowPress(x, y, true);
+                }
+                else if (touches[i].dwFlags & TOUCHEVENTF_UP) {
+                    HandleWindowPress(x, y, false);
+                }
+            }
+
+            CloseTouchInputHandle((HTOUCHINPUT)l_param);
+        }
+        break;
+    }
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    case WM_KEYDOWN:
+        // Exit the program if the user presses Escape
+        if (w_param == VK_ESCAPE) {
+            PostQuitMessage(0);
+        }
+        break;
+    default:
+        return DefWindowProc(hwnd, msg, w_param, l_param);
+    }
+
+    return 0;
 }
 
 // Draws a single button on the touch overlay, using the given render target and the given brush,
@@ -159,31 +300,14 @@ void DrawButtonsToCache() {
     }
 }
 
-// Draws the current state of the buttons on top of the cached, default state
-void DrawButtons() {
-    if (render_target == nullptr)
-        return;
+// Says whether the given touch point is inside the given button's drawn area
+bool IsTouchInside(OverlayButton& button, D2D1_POINT_2F& point) {
+    static D2D1_MATRIX_3X2_F identity = D2D1::Matrix3x2F::Identity();
 
-    // Clear with transparent background
-    render_target->BeginDraw();
-    render_target->Clear(D2D1::ColorF(0, 0.0f));
-
-    // Draw cached button backgrounds
-    ID2D1Bitmap* bitmap = nullptr;
-    cache_render_target->GetBitmap(&bitmap);
-
-    if (bitmap != nullptr) {
-        render_target->DrawBitmap(bitmap, D2D1::RectF(0, 0, kWindowRenderWidth, kWindowRenderHeight));
-        bitmap->Release();
+    // The cached geometries for the buttons have a built-in method to determine if a point is contained inside
+    if (button_geometries.count(button.id_) > 0) {
+        BOOL contains = FALSE;
+        button_geometries[button.id_]->FillContainsPoint(point, identity, &contains);
+        return contains;
     }
-
-    // Draw pressed state over buttons that are pressed
-    for (OverlayButton& button : touch_overlay_buttons) {
-        if (touch_overlay_button_states[button.id_]) {
-            DrawSingleButton(button, render_target, brush_pressed);
-        }
-    }
-
-    render_target->EndDraw();
 }
-
