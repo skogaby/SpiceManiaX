@@ -186,5 +186,8 @@
     <ClInclude Include="globals.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="overlay_button.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

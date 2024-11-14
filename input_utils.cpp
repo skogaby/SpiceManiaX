@@ -1,6 +1,6 @@
 #include "input_utils.h"
 
-const string InputUtils::kInputNames[2][4] = {
+const string InputUtils::kStageInputNames[2][4] = {
     { "P1 Panel Up", "P1 Panel Down", "P1 Panel Left", "P1 Panel Right" },
     { "P2 Panel Up", "P2 Panel Down", "P2 Panel Left", "P2 Panel Right" },
 };
@@ -27,21 +27,19 @@ void InputUtils::PerformInputTasks(Connection& con) {
     for (size_t player = 0; player < 2; player++) {
         for (size_t panel = 0; panel < 4; panel++) {
             ButtonState state;
-            state.name = kInputNames[player][panel];
+            state.name = kStageInputNames[player][panel];
             state.value = (float) BIT(pad_input_states_[player], kPanelIndices[panel]);
             button_states.push_back(state);
         }
     }
 
     // Get the touch overlay input values
-    // TODO: Refactor this once the overlay is better
-    static string names[2] = { "Service", "Test" };
-    for (int button = 0; button < 2; button++) {
+    for (OverlayButton& button : touch_overlay_buttons) {
         ButtonState state;
-        state.name = names[button];
-        state.value = overlay_button_states[button] ? 1.0f : 0.0f;
+        state.name = button.input_name_;
+        state.value = (float) touch_overlay_button_states[button.id_];
         button_states.push_back(state);
-    } 
+    }
 
     buttons_write(con, button_states);
 }

@@ -36,7 +36,7 @@ private:
     array<uint16_t, 2> pad_input_states_;
 
     // The input names that SpiceAPI expects for each panel
-    static const string kInputNames[2][4];
+    static const string kStageInputNames[2][4];
     // The StepManiaX panel indices which correspond to the panel at the same index
     // in `input_names` above.
     static constexpr size_t kPanelIndices[4] = { 1, 7, 3, 5 };

@@ -42,10 +42,10 @@ const int kFramerateIntervalMs = 33;
 const int kLightsOutputIntervalMs = 33;
 // Timer interval for when to send the inputs from the stage and overlay (1000Hz)
 const int kInputsUpdateIntervalMs = 1;
-// We reposition the window every 3 seconds, to make sure it always sits on top of DDR after it goes fullscreen
+// We reposition the window every 5 seconds, to make sure it always sits on top of DDR after it goes fullscreen
 const int kSetWindowPosIntervalMs = 5000;
 // We check for SpiceAPI connections during runtime every 3 seconds
-const int kConnectionCheckIntervalMs = 1000;
+const int kConnectionCheckIntervalMs = 3000;
 
 // Our connection object for communication with SpiceAPI
 Connection con("localhost", 1337, "spicemaniax");
@@ -92,7 +92,6 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
     WaitForConnection();
 
     printf("Connected to SpiceAPI successfully\n");
-    is_connected = true;
 
     // Create the actual overlay window and initialize Direct2D drawing
     CreateOverlayWindow(h_instance, cmd_show);
@@ -101,7 +100,7 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
     InitializeTimers();
 
     MSG msg = {};
-    while (GetMessage(&msg, NULL, 0, 0) && is_connected) {
+    while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
@@ -139,7 +138,7 @@ void CreateOverlayWindow(HINSTANCE hInstance, int nCmdShow) {
         wc.lpszClassName,
         L"SpiceManiaX Overlay",
         WS_POPUP | WS_VISIBLE,
-        0, 0, kDdrScreenWidth, kDdrScreenHeight,
+        0, 0, kWindowRenderWidth, kWindowRenderHeight,
         NULL, NULL, hInstance, NULL
     );
 
@@ -147,7 +146,7 @@ void CreateOverlayWindow(HINSTANCE hInstance, int nCmdShow) {
     SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
     SetWindowLongPtr(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
     SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_NOACTIVATE);
-    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kDdrScreenWidth, kDdrScreenHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kWindowRenderWidth, kWindowRenderHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 
     // Disable visual feedback for touch inputs
     BOOL feedbackEnabled = FALSE;
@@ -196,21 +195,12 @@ void CleanupTimers() {
 // Handles a window press, either from a touchscreen or from a mouse, and presses the appropriate
 // Overlay button
 void HandleWindowPress(int x, int y, bool pressed) {
-    // If the current screen width and height aren't 720p and don't match our render target resolution,
-    // then we need to map the press inputs from the screen coordinates to our render coordinates so
-    // the touches still register correctly
-    int screen_w = GetSystemMetrics(SM_CXSCREEN);
-    int screen_h = GetSystemMetrics(SM_CYSCREEN);
-
-    if (screen_w != kDdrScreenWidth || screen_h != kDdrScreenHeight) {
-        x = MapValue(x, 0, screen_w, 0, kDdrScreenWidth);
-        y = MapValue(y, 0, screen_h, 0, kDdrScreenHeight);
-    }
-
     // Check which buttons the touches are in bounds for
-    for (size_t j = 0; j < overlay_buttons.size(); ++j) {
-        if (PtInRect(&overlay_buttons[j], POINT{ x, y })) {
-            overlay_button_states[j] = pressed;
+    D2D1_POINT_2F touchPoint = D2D1::Point2F(x, y);
+    for (OverlayButton& button: touch_overlay_buttons) {
+        if (IsTouchInside(button, touchPoint)) {
+            touch_overlay_button_states[button.id_] = pressed;
+            return;
         }
     }
 }
@@ -303,5 +293,8 @@ void CALLBACK InputTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
 
 // Callback for the timer which triggers a SpiceAPI connectivity check
 void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    is_connected = con.check();
+    if (!con.check()) {
+        // If we lose the connection to SpiceAPI, exit the program
+        PostQuitMessage(0);
+    }
 }

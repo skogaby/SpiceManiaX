@@ -108,7 +108,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -144,6 +144,7 @@
     <ClInclude Include="math_utils.h" />
     <ClInclude Include="input_utils.h" />
     <ClInclude Include="lights_utils.h" />
+    <ClInclude Include="overlay_button.h" />
     <ClInclude Include="overlay_utils.h" />
     <ClInclude Include="rapidjson\allocators.h" />
     <ClInclude Include="rapidjson\document.h" />
