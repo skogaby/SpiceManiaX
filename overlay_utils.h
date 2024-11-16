@@ -33,10 +33,12 @@ bool IsTouchInside(OverlayButton& button, D2D1_POINT_2F& point);
 static const int kWindowRenderWidth = 1280;
 // Fullscreen height when DDR is running
 static const int kWindowRenderHeight = 720;
-// Width of the buttons for menu navigation in the overlay
+// Size of the buttons for menu navigation in the overlay
 static const int kMenuNavButtonWidth = 50;
-// Height of the buttons for menu navigation in the overlay
 static const int kMenuNavButtonHeight = 50;
+// Size of the buttons for the pinpad in the overlay
+static const int kPinpadButtonWidth = 30;
+static const int kPinpadButtonHeight = 30;
 
 // Direct2D factory
 extern ID2D1Factory* d2d_factory;

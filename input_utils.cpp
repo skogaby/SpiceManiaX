@@ -18,7 +18,7 @@ void InputUtils::SmxOnStateChanged(int pad) {
     pad_input_states_[pad] = SMXWrapper::getInstance().SMX_GetInputState(pad);
 }
 
-// Main function for sending inputs to SpiceAPI
+// Main function for sending stage inputs to SpiceAPI
 void InputUtils::PerformInputTasks(Connection& con) {
     // Send a SpiceAPI update with all our button values
     vector<ButtonState> button_states;
@@ -34,12 +34,51 @@ void InputUtils::PerformInputTasks(Connection& con) {
     }
 
     // Get the touch overlay input values
+    string key_strs[2] = { "", "" };
+
     for (OverlayButton& button : touch_overlay_buttons) {
-        ButtonState state;
-        state.name = button.input_name_;
-        state.value = (float) touch_overlay_button_states[button.id_];
-        button_states.push_back(state);
+        // The pinpad buttons are handled differently from the regular buttons
+        if (button.is_pinpad_) {
+            if (touch_overlay_button_states[button.id_]) {
+                char label;
+                int player = 0;
+
+                // Find the right key label to send to SpiceAPI
+                if (button.label_ == "") {
+                    label = 'D';
+                }
+                else if (button.label_ == "00") {
+                    label = 'A';
+                }
+                else {
+                    label = button.label_.c_str()[0];
+                }
+
+                // Determine which player this is for
+                if (button.input_name_.find("P2") != string::npos) {
+                    player = 1;
+                }
+
+                key_strs[player] += label;
+            }
+        } else {
+            ButtonState state;
+            state.name = button.input_name_;
+            state.value = (float) touch_overlay_button_states[button.id_];
+            button_states.push_back(state);
+        }
     }
 
+    // Send the regular button updates + stage updates
     buttons_write(con, button_states);
+
+    // Handle the pinpad updates
+    for (int player = 0; player < 2; player++) {
+        vector<char> keys;
+        for (auto& c : key_strs[player]) {
+            keys.push_back(c);
+        }
+
+        keypads_set(con, player, keys);
+    }
 }

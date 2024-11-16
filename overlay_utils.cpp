@@ -103,37 +103,72 @@ void InitializeTouchOverlay() {
 
 // Sets up the overlay button objects for both players
 void SetupOverlayButtons() {
-    // Define the menu navigation buttons. All the coordinates are defined pretty jankily, but it is what it is. Everything
-    // is anchored from the position of the Menu Up button for each player.
-    static int up_cxs[2] = { 100, 1080 };
-    static int up_cys[2] = { 575, 575 };
-
     for (int player = 0; player < 2; player++) {
-        int up_cx = up_cxs[player];
-        int up_cy = up_cys[player];
-        int button_index = (player * 100);
         string player_str = "P" + to_string(player + 1) + " ";
+        int button_index = (player * 100);
+
+        // Define the menu navigation buttons. All the coordinates are defined pretty jankily, but it is what it is. Everything
+        // is anchored from the position of the Menu Up button for each player.
+        static int menu_up_cxs[2] = { 100, 1080 };
+        static int menu_up_cys[2] = { 575, 575 };
+        int menu_up_cx = menu_up_cxs[player];
+        int menu_up_cy = menu_up_cys[player];
 
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Up", "",
-            up_cx,
-            up_cy,
-            kMenuNavButtonWidth, kMenuNavButtonHeight, true });
+            menu_up_cx,
+            menu_up_cy,
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Down", "",
-            up_cx,
-            static_cast<int>(up_cy + (kMenuNavButtonHeight * 1.75)),
-            kMenuNavButtonWidth, kMenuNavButtonHeight, true });
+            menu_up_cx,
+            static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * 1.75)),
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Left", "",
-            up_cx - kMenuNavButtonWidth + 5,
-            static_cast<int>(up_cy + (kMenuNavButtonHeight * (1.75 / 2))),
-            kMenuNavButtonWidth, kMenuNavButtonHeight, true });
+            menu_up_cx - kMenuNavButtonWidth + 5,
+            static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * (1.75 / 2))),
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Right", "",
-            up_cx + kMenuNavButtonWidth - 5,
-            static_cast<int>(up_cy + (kMenuNavButtonHeight * (1.75 / 2))),
-            kMenuNavButtonWidth, kMenuNavButtonHeight, true });
+            menu_up_cx + kMenuNavButtonWidth - 5,
+            static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * (1.75 / 2))),
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Start", "",
-            up_cx + (kMenuNavButtonWidth * 3),
-            up_cy + kMenuNavButtonHeight - 5,
-            kMenuNavButtonWidth, kMenuNavButtonHeight, false });
+            menu_up_cx + (kMenuNavButtonWidth * 3),
+            menu_up_cy + kMenuNavButtonHeight - 5,
+            kMenuNavButtonWidth, kMenuNavButtonHeight, false, false });
+
+        // Define the pinpad buttons for each player. Similar to the menu buttons, we'll anchor these based on the coordinates
+        // for the top-left key on the pinpad (Key 7)
+        static string pinpad_key_input_names[4][3] = {
+            { "Keypad 7", "Keypad 8", "Keypad 9" },
+            { "Keypad 4", "Keypad 5", "Keypad 6" },
+            { "Keypad 1", "Keypad 2", "Keypad 3" },
+            { "Keypad 0", "Keypad 00", "Keypad Decimal" }
+        };
+        static string pinpad_key_labels[4][3] = {
+            { "7", "8", "9" },
+            { "4", "5", "6" },
+            { "1", "2", "3" },
+            { "0", "00", "" }
+        };
+        static int first_key_cxs[2] = { 75, 1065 };
+        static int first_key_cys[2] = { 100, 100 };
+        int first_key_cx = first_key_cxs[player];
+        int first_key_cy = first_key_cys[player];
+
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 3; col++) {
+                touch_overlay_buttons.push_back({
+                    button_index++,
+                    player_str + pinpad_key_input_names[row][col],
+                    pinpad_key_labels[row][col],
+                    first_key_cx + ((kPinpadButtonWidth + 10) * col),
+                    first_key_cy + ((kPinpadButtonHeight + 10) * row),
+                    kPinpadButtonWidth,
+                    kPinpadButtonHeight,
+                    false,
+                    true
+                });
+            }
+        }
     }
 }
 

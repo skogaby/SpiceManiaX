@@ -22,4 +22,6 @@ struct OverlayButton {
 	int height_;
 	// Says whether the button is rotated by 45 degrees or not
 	bool rotated_;
+	// Says whether the button is for a pinpad (these are handled differently on the API side)
+	bool is_pinpad_;
 };

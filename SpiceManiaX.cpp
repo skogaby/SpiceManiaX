@@ -36,7 +36,7 @@ void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, D
 const int kFramerateIntervalMs = 33;
 // Timer interval for when to update the lights on the cabinet (30Hz)
 const int kLightsOutputIntervalMs = 33;
-// Timer interval for when to send the inputs from the stage and overlay (1000Hz)
+// Timer interval for when to send the button inputs from the stage and overlay (1000Hz)
 const int kInputsUpdateIntervalMs = 1;
 // We reposition the window every 5 seconds, to make sure it always sits on top of DDR after it goes fullscreen
 const int kSetWindowPosIntervalMs = 5000;
