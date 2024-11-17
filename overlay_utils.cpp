@@ -94,36 +94,40 @@ void InitializeTouchOverlay() {
 
 // Sets up the overlay button objects for both players
 void SetupOverlayButtons() {
+    // Build the overlay elements for each player
     for (int player = 0; player < 2; player++) {
         string player_str = "P" + to_string(player + 1) + " ";
         int button_index = (player * 100);
 
+
+        // 30 pixels from the edge of the screen to the center of the nearest menu button
+        static const int menu_edge_to_screen = 30;
         // Define the menu navigation buttons. All the coordinates are defined pretty jankily, but it is what it is. Everything
         // is anchored from the position of the Menu Up button for each player.
-        static int menu_up_cxs[2] = { 100, 1080 };
-        static int menu_up_cys[2] = { 575, 575 };
-        int menu_up_cx = menu_up_cxs[player];
-        int menu_up_cy = menu_up_cys[player];
+        static const int menu_up_cxs[2] = { 100, 1072 };
+        static const int menu_up_cy = 575;
+        int menu_up_down_cx = menu_up_cxs[player];
+        int menu_left_right_start_cy = static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * (1.75 / 2)));
 
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Up", "",
-            menu_up_cx,
+            menu_up_down_cx,
             menu_up_cy,
             kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Down", "",
-            menu_up_cx,
+            menu_up_down_cx,
             static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * 1.75)),
             kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Left", "",
-            menu_up_cx - kMenuNavButtonWidth + 5,
-            static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * (1.75 / 2))),
+            menu_up_down_cx - kMenuNavButtonWidth + 5,
+            menu_left_right_start_cy,
             kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Right", "",
-            menu_up_cx + kMenuNavButtonWidth - 5,
-            static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * (1.75 / 2))),
+            menu_up_down_cx + kMenuNavButtonWidth - 5,
+            menu_left_right_start_cy,
             kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Start", "",
-            menu_up_cx + (kMenuNavButtonWidth * 3),
-            menu_up_cy + kMenuNavButtonHeight - 5,
+            menu_up_down_cx + static_cast<int>(kMenuNavButtonWidth * 3.25),
+            menu_left_right_start_cy,
             kMenuNavButtonWidth, kMenuNavButtonHeight, false, false });
 
         // Define the pinpad buttons for each player. Similar to the menu buttons, we'll anchor these based on the coordinates
@@ -140,10 +144,22 @@ void SetupOverlayButtons() {
             { "1", "2", "3" },
             { "0", "00", "" }
         };
-        static int first_key_cxs[2] = { 75, 1065 };
-        static int first_key_cys[2] = { 100, 100 };
+        // 20 pixels from either edge of the screen to the edge of the overlay elements
+        static const int pinpad_edge_to_screen = 20;
+        // 10 pixels between the keys on the pinpad
+        static const int pinpad_spacing = 10;
+        // The width of a whole pinpad, edge-to-edge, including spacing between keys
+        static const int pinpad_width = (kPinpadButtonWidth * 3) + (2 * pinpad_spacing);
+        // X-coords of the top-left key of each pinpad
+        static const int first_key_cxs[2] = {
+            pinpad_edge_to_screen + (kPinpadButtonWidth / 2), 
+            kWindowRenderWidth - pinpad_width - pinpad_edge_to_screen + (kPinpadButtonWidth / 2)
+        };
+        // Y-coords of the top-left key of each pinpad
+        static int first_key_cy = 60;
+        // Get the coords for the first key, then lay everything else
+        // out based on the first key
         int first_key_cx = first_key_cxs[player];
-        int first_key_cy = first_key_cys[player];
 
         for (int row = 0; row < 4; row++) {
             for (int col = 0; col < 3; col++) {
@@ -151,8 +167,8 @@ void SetupOverlayButtons() {
                     button_index++,
                     player_str + pinpad_key_input_names[row][col],
                     pinpad_key_labels[row][col],
-                    first_key_cx + ((kPinpadButtonWidth + 10) * col),
-                    first_key_cy + ((kPinpadButtonHeight + 10) * row),
+                    first_key_cx + ((kPinpadButtonWidth + pinpad_spacing) * col),
+                    first_key_cy + ((kPinpadButtonHeight + pinpad_spacing) * row),
                     kPinpadButtonWidth,
                     kPinpadButtonHeight,
                     false,
