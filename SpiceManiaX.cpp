@@ -28,15 +28,15 @@ void InitializeTimers();
 void CleanupTimers();
 void SmxOnLog(const char* log);
 void WaitForConnection();
-void CALLBACK LightsTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK ThirtyHzTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
 void CALLBACK InputTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
 void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
 
-// Timer interval for how often we update the overlay graphics (30fps)
-const int kFramerateIntervalMs = 33;
-// Timer interval for when to update the lights on the cabinet (30Hz)
-const int kLightsOutputIntervalMs = 33;
-// Timer interval for when to send the button inputs from the stage and overlay (1000Hz)
+// Timer interval for how often we update the overlay graphics, update lights, and send
+// pinpad inputs (30Hz)
+const int k30HzTasksIntervalMs = 33;
+// Timer interval for when to send the button inputs from the stage (1000Hz)
 const int kInputsUpdateIntervalMs = 1;
 // We reposition the window every 5 seconds, to make sure it always sits on top of DDR after it goes fullscreen
 const int kSetWindowPosIntervalMs = 5000;
@@ -49,14 +49,12 @@ Connection con("localhost", 1337, "spicemaniax");
 LightsUtils lights_util;
 // Util class for handling stage input ineractions (read stage inputs when the state changes, output via SpiceAPI)
 InputUtils input_utils;
-// Media Timer ID for the lights timer
-static UINT lights_timer_id;
 // Media Timer ID for the stage inputs timer
 static UINT stage_input_timer_id;
 // Media Timer ID for checking Spice API connectivity
 static UINT connection_check_timer_id;
 // Media Timer ID for redrawing the overlay
-static UINT redraw_timer_id;
+static UINT thirty_hz_timer_id;
 // Media Timer ID for updating the window position
 static UINT window_position_timer_id;
 
@@ -123,14 +121,12 @@ void InitializeTimers() {
     // Set system media timer resolution to 1 ms, so we can have accurate timers for inputs and outputs
     timeBeginPeriod(1);
 
-    // Start a 33ms timer, so we can output lights at 30Hz
-    lights_timer_id = timeSetEvent(kLightsOutputIntervalMs, 1, LightsTimerCallback, 0, TIME_PERIODIC);
     // Start a 1ms timer, so we can send stage inputs at 1000Hz
     stage_input_timer_id = timeSetEvent(kInputsUpdateIntervalMs, 1, InputTimerCallback, 0, TIME_PERIODIC);
+    // Start a 33ms timer for triggering overlay redraws, sending pinpad inputs, and updating the lights
+    thirty_hz_timer_id = timeSetEvent(k30HzTasksIntervalMs, 1, ThirtyHzTimerCallback, 0, TIME_PERIODIC);
     // Start a 3 second timer which polls for SpiceAPI connectivity
     connection_check_timer_id = timeSetEvent(kConnectionCheckIntervalMs, 1, ConnectivityCheckTimerCallback, 0, TIME_PERIODIC);
-    // Start a 33ms timer for triggering overlay redraws
-    redraw_timer_id = timeSetEvent(kFramerateIntervalMs, 1, RedrawTimerCallback, 0, TIME_PERIODIC);
     // Start a 5 second timer to make sure the window is always repositioned on top
     window_position_timer_id = timeSetEvent(kSetWindowPosIntervalMs, 1, WindowPosTimerCallback, 0, TIME_PERIODIC);
 } 
@@ -138,10 +134,9 @@ void InitializeTimers() {
 // Kills our timers and cleans up the timer resolution settings
 void CleanupTimers() {
     // Kill the timers
-    timeKillEvent(lights_timer_id);
     timeKillEvent(stage_input_timer_id);
+    timeKillEvent(thirty_hz_timer_id);
     timeKillEvent(connection_check_timer_id);
-    timeKillEvent(redraw_timer_id);
     timeKillEvent(window_position_timer_id);
     // Reset the timer resolution period
     timeEndPeriod(1);
@@ -163,14 +158,16 @@ void WaitForConnection() {
     }
 }
 
-// Callback for the 33ms timer we set for the lights, to always output at 30Hz
-void CALLBACK LightsTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+// Callback for the 30Hz timer which updates the lights, sends pinpad updates, and redraws the overlay
+void CALLBACK ThirtyHzTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
     lights_util.PerformLightsTasks(con);
+    input_utils.PerformPinpadInputTasks(con);
+    InvalidateRect(hwnd, NULL, FALSE);
 }
 
 // Callback for the 1ms timer we set for the stage inputs, to always output at 1000Hz
 void CALLBACK InputTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    input_utils.PerformInputTasks(con);
+    input_utils.PerformStageInputTasks(con);
 }
 
 // Callback for the timer which triggers a SpiceAPI connectivity check
@@ -179,4 +176,9 @@ void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, D
         // If we lose the connection to SpiceAPI, exit the program
         PostQuitMessage(0);
     }
+}
+
+// Callback for the timer which triggers the window to reposition itself on top of everything else
+void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kWindowRenderWidth, kWindowRenderHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 }

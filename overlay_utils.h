@@ -16,8 +16,6 @@
 using namespace std;
 
 struct OverlayButton;
-void CALLBACK RedrawTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
-void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
 void CreateOverlayWindow(HINSTANCE h_instance, int cmd_show);
 void InitializeTouchOverlay();
 void SetupOverlayButtons();

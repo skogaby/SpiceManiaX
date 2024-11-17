@@ -16,15 +16,6 @@ static ID2D1SolidColorBrush* brush_pressed = nullptr;
 // to use the geometry objects for bounds checking
 static map<int, ID2D1TransformedGeometry*> button_geometries;
 
-// Callback for the timer which triggers an overlay redraw
-void CALLBACK RedrawTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    InvalidateRect(hwnd, NULL, FALSE);
-}
-
-// Callback for the timer which triggers the window to reposition itself on top of everything else
-void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kWindowRenderWidth, kWindowRenderHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
-}
 
 // Creates the overlay window and initializes the Direct2D contexts
 void CreateOverlayWindow(HINSTANCE hInstance, int nCmdShow) {

@@ -27,7 +27,8 @@ using namespace std;
 class InputUtils {
 public:
     static void SMXStateChangedCallback(int pad, SMXUpdateCallbackReason reason, void* pUser);
-    void PerformInputTasks(Connection& con);
+    void PerformStageInputTasks(Connection& con);
+    void PerformPinpadInputTasks(Connection& con);
 
 private:
     void SmxOnStateChanged(int pad);
