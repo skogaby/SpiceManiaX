@@ -49,7 +49,7 @@ void InputUtils::PerformMainInputTasks(Connection& con) {
 
 // Function for sending pinpad inputs to SpiceAPI
 void InputUtils::PerformPinpadInputTasks(Connection& con) {
-    string key_strs[2] = { "", "" };
+    vector<char> keys[2];
 
     // Get the touch overlay input values
     for (OverlayButton& button : touch_overlay_buttons) {
@@ -66,17 +66,12 @@ void InputUtils::PerformPinpadInputTasks(Connection& con) {
                 label = button.label_.c_str()[0];
             }
 
-             key_strs[button.player_] += label;
+            keys[button.player_].push_back(label);
         }
     }
 
     // Handle the pinpad updates
     for (int player = 0; player < 2; player++) {
-        vector<char> keys;
-        for (auto& c : key_strs[player]) {
-            keys.push_back(c);
-        }
-
-        keypads_set(con, player, keys);
+        keypads_set(con, player, keys[player]);
     }
 }
