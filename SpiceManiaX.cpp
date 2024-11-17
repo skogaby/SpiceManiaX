@@ -167,7 +167,7 @@ void CALLBACK ThirtyHzTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR)
 
 // Callback for the 1ms timer we set for the stage inputs, to always output at 1000Hz
 void CALLBACK InputTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    input_utils.PerformStageInputTasks(con);
+    input_utils.PerformMainInputTasks(con);
 }
 
 // Callback for the timer which triggers a SpiceAPI connectivity check

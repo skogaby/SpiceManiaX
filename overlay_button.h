@@ -2,6 +2,14 @@
 
 #include <string>
 
+// Enum for different overlay button types
+enum OverlayButtonType {
+	MENU,
+	PINPAD,
+	CARD_IN,
+	VISIBILITY
+};
+
 // Struct which defines a button for the touch overlay. All buttons are
 // drawn as and defined in the context of rectangles.
 struct OverlayButton {
@@ -22,6 +30,8 @@ struct OverlayButton {
 	int height_;
 	// Says whether the button is rotated by 45 degrees or not
 	bool rotated_;
-	// Says whether the button is for a pinpad (these are handled differently on the API side)
-	bool is_pinpad_;
+	// Type of button this is
+	OverlayButtonType type_;
+	// Which player the button is for
+	int player_;
 };

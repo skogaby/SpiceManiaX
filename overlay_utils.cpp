@@ -4,10 +4,9 @@
 static ID2D1Factory* d2d_factory = nullptr;
 // Main render target for the overlay
 static ID2D1HwndRenderTarget* render_target = nullptr;
-// The offscreen, cached render target for the touch overlay. We use this for drawing
-// the base state of the overlay a single time, then just render the cached target
-// and draw the button presses on top of this, if necessary
-static ID2D1BitmapRenderTarget* cache_render_target = nullptr;
+// Cached render targets for our overlay in various states of visibility
+static ID2D1BitmapRenderTarget* cached_render_targets[2][2] =
+    { { nullptr, nullptr }, { nullptr, nullptr } };
 // The Direct2D brush for drawing the base state of each button
 static ID2D1SolidColorBrush* brush_normal = nullptr;
 // The Direct2D brush for drawing the pressed state of each button
@@ -15,7 +14,6 @@ static ID2D1SolidColorBrush* brush_pressed = nullptr;
 // A map of button IDs to their cached geometry objects, for faster redraws and the ability
 // to use the geometry objects for bounds checking
 static map<int, ID2D1TransformedGeometry*> button_geometries;
-
 
 // Creates the overlay window and initializes the Direct2D contexts
 void CreateOverlayWindow(HINSTANCE hInstance, int nCmdShow) {
@@ -71,8 +69,11 @@ void InitializeTouchOverlay() {
         &render_target
     );
 
-    // Create an off-screen render target for caching static button backgrounds
-    render_target->CreateCompatibleRenderTarget(&cache_render_target);
+    // Create off-screen render targets for caching static button backgrounds
+    render_target->CreateCompatibleRenderTarget(&cached_render_targets[0][0]);
+    render_target->CreateCompatibleRenderTarget(&cached_render_targets[0][1]);
+    render_target->CreateCompatibleRenderTarget(&cached_render_targets[1][0]);
+    render_target->CreateCompatibleRenderTarget(&cached_render_targets[1][1]);
 
     // Create brushes for button states
     render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::CornflowerBlue), &brush_normal);
@@ -87,9 +88,9 @@ void InitializeTouchOverlay() {
     }
 
     // Draw static content (buttons in normal state) to the off-screen render target
-    cache_render_target->BeginDraw();
-    DrawButtonsToCache();
-    cache_render_target->EndDraw();
+    // cache_render_target_visible->BeginDraw();
+    DrawButtonsToCaches();
+    // cache_render_target_visible->EndDraw();
 }
 
 // Sets up the overlay button objects for both players
@@ -99,36 +100,35 @@ void SetupOverlayButtons() {
         string player_str = "P" + to_string(player + 1) + " ";
         int button_index = (player * 100);
 
-
         // 30 pixels from the edge of the screen to the center of the nearest menu button
-        static const int menu_edge_to_screen = 30;
+        static constexpr int menu_edge_to_screen = 30;
         // Define the menu navigation buttons. All the coordinates are defined pretty jankily, but it is what it is. Everything
         // is anchored from the position of the Menu Up button for each player.
-        static const int menu_up_cxs[2] = { 100, 1072 };
-        static const int menu_up_cy = 575;
+        static constexpr int menu_up_cxs[2] = { 100, 1072 };
+        static constexpr int menu_up_cy = 575;
         int menu_up_down_cx = menu_up_cxs[player];
         int menu_left_right_start_cy = static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * (1.75 / 2)));
 
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Up", "",
             menu_up_down_cx,
             menu_up_cy,
-            kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true, OverlayButtonType::MENU, player });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Down", "",
             menu_up_down_cx,
             static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * 1.75)),
-            kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true, OverlayButtonType::MENU, player });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Left", "",
             menu_up_down_cx - kMenuNavButtonWidth + 5,
             menu_left_right_start_cy,
-            kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true, OverlayButtonType::MENU, player });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Right", "",
             menu_up_down_cx + kMenuNavButtonWidth - 5,
             menu_left_right_start_cy,
-            kMenuNavButtonWidth, kMenuNavButtonHeight, true, false });
+            kMenuNavButtonWidth, kMenuNavButtonHeight, true, OverlayButtonType::MENU, player });
         touch_overlay_buttons.push_back({ button_index++, player_str + "Start", "",
             menu_up_down_cx + static_cast<int>(kMenuNavButtonWidth * 3.25),
             menu_left_right_start_cy,
-            kMenuNavButtonWidth, kMenuNavButtonHeight, false, false });
+            kMenuNavButtonWidth, kMenuNavButtonHeight, false, OverlayButtonType::MENU, player });
 
         // Define the pinpad buttons for each player. Similar to the menu buttons, we'll anchor these based on the coordinates
         // for the top-left key on the pinpad (Key 7)
@@ -145,21 +145,22 @@ void SetupOverlayButtons() {
             { "0", "00", "" }
         };
         // 20 pixels from either edge of the screen to the edge of the overlay elements
-        static const int pinpad_edge_to_screen = 20;
+        static constexpr int pinpad_edge_to_screen = 20;
         // 10 pixels between the keys on the pinpad
-        static const int pinpad_spacing = 10;
+        static constexpr int pinpad_spacing = 10;
         // The width of a whole pinpad, edge-to-edge, including spacing between keys
-        static const int pinpad_width = (kPinpadButtonWidth * 3) + (2 * pinpad_spacing);
+        static constexpr int pinpad_width = (kPinpadButtonWidth * 3) + (2 * pinpad_spacing);
         // X-coords of the top-left key of each pinpad
-        static const int first_key_cxs[2] = {
+        static constexpr int first_pinpad_key_cxs[2] = {
             pinpad_edge_to_screen + (kPinpadButtonWidth / 2), 
             kWindowRenderWidth - pinpad_width - pinpad_edge_to_screen + (kPinpadButtonWidth / 2)
         };
         // Y-coords of the top-left key of each pinpad
-        static int first_key_cy = 60;
+        static constexpr int first_pinpad_key_cy =
+            (2 * pinpad_edge_to_screen) + (kUtilityButtonHeight) + (kPinpadButtonHeight / 2);
         // Get the coords for the first key, then lay everything else
         // out based on the first key
-        int first_key_cx = first_key_cxs[player];
+        int first_key_cx = first_pinpad_key_cxs[player];
 
         for (int row = 0; row < 4; row++) {
             for (int col = 0; col < 3; col++) {
@@ -168,14 +169,27 @@ void SetupOverlayButtons() {
                     player_str + pinpad_key_input_names[row][col],
                     pinpad_key_labels[row][col],
                     first_key_cx + ((kPinpadButtonWidth + pinpad_spacing) * col),
-                    first_key_cy + ((kPinpadButtonHeight + pinpad_spacing) * row),
+                    first_pinpad_key_cy + ((kPinpadButtonHeight + pinpad_spacing) * row),
                     kPinpadButtonWidth,
                     kPinpadButtonHeight,
                     false,
-                    true
+                    OverlayButtonType::PINPAD,
+                    player
                 });
             }
         }
+
+        // Setup the show/hide overlay button
+        static constexpr int overlay_vis_cxs[2] = {
+            pinpad_edge_to_screen + (kUtilityButtonWidth / 2),
+            kWindowRenderWidth - pinpad_edge_to_screen - (kUtilityButtonWidth / 2)
+        };
+        static constexpr int overlay_vis_cy = pinpad_edge_to_screen + (kUtilityButtonHeight / 2);
+
+        touch_overlay_buttons.push_back({ button_index++, "", "",
+            overlay_vis_cxs[player],
+            overlay_vis_cy,
+            kUtilityButtonWidth, kUtilityButtonHeight, false, OverlayButtonType::VISIBILITY, player });
     }
 }
 
@@ -190,7 +204,7 @@ void RenderTouchOverlay() {
 
     // Draw cached button backgrounds
     ID2D1Bitmap* bitmap = nullptr;
-    cache_render_target->GetBitmap(&bitmap);
+    cached_render_targets[is_overlay_visible[0]][is_overlay_visible[1]]->GetBitmap(&bitmap);
 
     if (bitmap != nullptr) {
         render_target->DrawBitmap(bitmap, D2D1::RectF(0, 0, kWindowRenderWidth, kWindowRenderHeight));
@@ -211,7 +225,10 @@ void RenderTouchOverlay() {
 void CleanupTouchOverlay() {
     if (brush_normal != nullptr) brush_normal->Release();
     if (brush_pressed != nullptr) brush_pressed->Release();
-    if (cache_render_target != nullptr) cache_render_target->Release();
+    if (cached_render_targets[0][0] != nullptr) cached_render_targets[0][0]->Release();
+    if (cached_render_targets[0][1] != nullptr) cached_render_targets[0][1]->Release();
+    if (cached_render_targets[1][0] != nullptr) cached_render_targets[1][0]->Release();
+    if (cached_render_targets[1][1] != nullptr) cached_render_targets[1][1]->Release();
     if (render_target != nullptr) render_target->Release();
     if (d2d_factory != nullptr) d2d_factory->Release();
 
@@ -231,6 +248,13 @@ void HandleWindowPress(int x, int y, bool pressed) {
     for (OverlayButton& button : touch_overlay_buttons) {
         if (IsTouchInside(button, touchPoint)) {
             touch_overlay_button_states[button.id_] = pressed;
+
+            // If we were pressing an overlay visibility button, toggle
+            // the overlay's visibility status.
+            if (pressed && button.type_ == OverlayButtonType::VISIBILITY) {
+                is_overlay_visible[button.player_] = !is_overlay_visible[button.player_];
+            }
+
             return;
         }
     }
@@ -335,11 +359,33 @@ void DrawSingleButton(OverlayButton& button, ID2D1RenderTarget* render_target, I
 }
 
 // Draw the static button backgrounds and default visual states to the cached render target
-void DrawButtonsToCache() {
+void DrawButtonsToCaches() {
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2; j++)
+            cached_render_targets[i][j]->BeginDraw();
+
     // Draw static button backgrounds to the off-screen render target
     for (OverlayButton& button : touch_overlay_buttons) {
-        DrawSingleButton(button, cache_render_target, brush_normal);
+        if (button.type_ == OverlayButtonType::VISIBILITY) {
+            // Draw the visibility button on all render targets
+            DrawSingleButton(button, cached_render_targets[0][0], brush_normal);
+            DrawSingleButton(button, cached_render_targets[0][1], brush_normal);
+            DrawSingleButton(button, cached_render_targets[1][0], brush_normal);
+            DrawSingleButton(button, cached_render_targets[1][1], brush_normal);
+        } else if (button.player_ == 0) {
+            // Draw player 1 buttons on the visible player 1 targets
+            DrawSingleButton(button, cached_render_targets[1][0], brush_normal);
+            DrawSingleButton(button, cached_render_targets[1][1], brush_normal);
+        } else if (button.player_ == 1) {
+            // Draw player 2 buttons on the visible player 2 targets
+            DrawSingleButton(button, cached_render_targets[0][1], brush_normal);
+            DrawSingleButton(button, cached_render_targets[1][1], brush_normal);
+        }
     }
+
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2; j++)
+            cached_render_targets[i][j]->EndDraw();
 }
 
 // Says whether the given touch point is inside the given button's drawn area

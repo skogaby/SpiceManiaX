@@ -8,3 +8,5 @@ std::vector<RECT> overlay_buttons;
 std::vector<OverlayButton> touch_overlay_buttons;
 // Mapping of button IDs to button press states
 std::map<int, bool> touch_overlay_button_states;
+// Says whether the overlay is currently being shown or not for each player
+bool is_overlay_visible[2] = { true, true };

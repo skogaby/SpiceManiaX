@@ -24,28 +24,29 @@ void CleanupTouchOverlay();
 void HandleWindowPress(int x, int y, bool pressed);
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void DrawSingleButton(OverlayButton& button, ID2D1RenderTarget* render_target, ID2D1SolidColorBrush* brush);
-void DrawButtonsToCache();
+void DrawButtonsToCaches();
 bool IsTouchInside(OverlayButton& button, D2D1_POINT_2F& point);
 
-// Fullscreen width when DDR is running
-static const int kWindowRenderWidth = 1280;
-// Fullscreen height when DDR is running
-static const int kWindowRenderHeight = 720;
+// Size of the window when DDR is running in fullscreen, we'll match our render size
+static constexpr int kWindowRenderWidth = 1280;
+static constexpr int kWindowRenderHeight = 720;
 // Size of the buttons for menu navigation in the overlay
-static const int kMenuNavButtonWidth = 50;
-static const int kMenuNavButtonHeight = 50;
+static constexpr int kMenuNavButtonWidth = 50;
+static constexpr int kMenuNavButtonHeight = 50;
 // Size of the buttons for the pinpad in the overlay
-static const int kPinpadButtonWidth = 30;
-static const int kPinpadButtonHeight = 30;
+static constexpr int kPinpadButtonWidth = 30;
+static constexpr int kPinpadButtonHeight = 30;
+// Size of the buttons for carding in and hiding the overlay
+static constexpr int kUtilityButtonWidth = 100;
+static constexpr int kUtilityButtonHeight = 30;
+
 
 // Direct2D factory
 extern ID2D1Factory* d2d_factory;
 // Main render target for the overlay
 extern ID2D1HwndRenderTarget* render_target;
-// The offscreen, cached render target for the touch overlay. We use this for drawing
-// the base state of the overlay a single time, then just render the cached target
-// and draw the button presses on top of this, if necessary
-extern ID2D1BitmapRenderTarget* cache_render_target;
+// Cached render targets for our overlay in various states of visibility
+extern ID2D1BitmapRenderTarget* cached_render_targets[2][2];
 // The Direct2D brush for drawing the base state of each button
 extern ID2D1SolidColorBrush* brush_normal;
 // The Direct2D brush for drawing the pressed state of each button
