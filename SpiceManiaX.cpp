@@ -19,6 +19,7 @@
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "d2d1")
+#pragma comment(lib, "dwrite.lib")
 
 using namespace spiceapi;
 using namespace std;
@@ -26,6 +27,7 @@ using namespace std;
 // Commandline argument keys
 const string kP1CardArg = "p1card";
 const string kP2CardArg = "p2card";
+const string kOpacityArg = "opacity";
 
 // Forward function declarations
 void ParseArgs();
@@ -176,6 +178,10 @@ void ParseArgs() {
 
     if (args_map.count(kP2CardArg) > 0) {
         card_ids[1] = args_map[kP2CardArg];
+    }
+
+    if (args_map.count(kOpacityArg) > 0) {
+        overlay_opacity = stof(args_map[kOpacityArg]);
     }
 }
 

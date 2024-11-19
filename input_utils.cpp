@@ -58,9 +58,9 @@ void InputUtils::PerformPinpadInputTasks(Connection& con) {
             int player = 0;
 
             // Find the right key label to send to SpiceAPI
-            if (button.label_ == "") {
+            if (button.label_ == L"") {
                 label = 'D';
-            } else if (button.label_ == "00") {
+            } else if (button.label_ == L"00") {
                 label = 'A';
             } else {
                 label = button.label_.c_str()[0];

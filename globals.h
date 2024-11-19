@@ -17,3 +17,5 @@ extern std::map<int, bool> touch_overlay_button_states;
 extern bool is_overlay_visible[2];
 // The card IDs to use for each player, if available
 extern std::string card_ids[2];
+// The opacity value to use for the overlay, between 0.0 and 1.0
+extern float overlay_opacity;

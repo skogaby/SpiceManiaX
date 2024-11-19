@@ -2,15 +2,20 @@
 
 // Direct2D factory
 static ID2D1Factory* d2d_factory = nullptr;
+// Direct2D factory for creating text objects
+static IDWriteFactory* d2d_write_factory = nullptr;
+// The text formatter object for Direct2D text rendering
+static IDWriteTextFormat* d2d_text_format = nullptr;
 // Main render target for the overlay
 static ID2D1HwndRenderTarget* render_target = nullptr;
 // Cached render targets for our overlay in various states of visibility
 static ID2D1BitmapRenderTarget* cached_render_targets[2][2] =
     { { nullptr, nullptr }, { nullptr, nullptr } };
-// The Direct2D brush for drawing the base state of each button
-static ID2D1SolidColorBrush* brush_normal = nullptr;
-// The Direct2D brush for drawing the pressed state of each button
-static ID2D1SolidColorBrush* brush_pressed = nullptr;
+// The Direct2D brushes for drawing our overlay buttons in various states
+static ID2D1SolidColorBrush* brush_menu_fill = nullptr;
+static ID2D1SolidColorBrush* brush_pinpad_fill = nullptr;
+static ID2D1SolidColorBrush* brush_button_outline_normal = nullptr;
+static ID2D1SolidColorBrush* brush_button_outline_pressed = nullptr;
 // A map of button IDs to their cached geometry objects, for faster redraws and the ability
 // to use the geometry objects for bounds checking
 static map<int, ID2D1TransformedGeometry*> button_geometries;
@@ -36,7 +41,7 @@ void CreateOverlayWindow(HINSTANCE hInstance, int nCmdShow) {
     );
 
     // Set the window styling so it's transparent, borderless, and always on top
-    SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+    SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 255 * overlay_opacity, LWA_COLORKEY | LWA_ALPHA);
     SetWindowLongPtr(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
     SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_NOACTIVATE);
     SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kWindowRenderWidth, kWindowRenderHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
@@ -76,8 +81,27 @@ void InitializeTouchOverlay() {
     render_target->CreateCompatibleRenderTarget(&cached_render_targets[1][1]);
 
     // Create brushes for button states
-    render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::CornflowerBlue), &brush_normal);
-    render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Red), &brush_pressed);
+    render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::WhiteSmoke), &brush_menu_fill);
+    render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::SlateGray), &brush_pinpad_fill);
+    render_target->CreateSolidColorBrush(D2D1::ColorF(0.01, 0.01, 0.01), &brush_button_outline_normal);
+    render_target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Red), &brush_button_outline_pressed);
+
+    // Create the objects needed for text rendering
+    DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&d2d_write_factory));
+    d2d_write_factory->CreateTextFormat(
+        L"Arial",
+        NULL,
+        DWRITE_FONT_WEIGHT_REGULAR,
+        DWRITE_FONT_STYLE_NORMAL,
+        DWRITE_FONT_STRETCH_NORMAL,
+        14.0f,
+        L"en-us",
+        &d2d_text_format
+    );
+
+    // Center align text horizontally and vertically
+    d2d_text_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+    d2d_text_format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
     // Create all the buttons for the overlay
     SetupOverlayButtons();
@@ -105,23 +129,23 @@ void SetupOverlayButtons() {
         int menu_up_down_cx = menu_up_cxs[player];
         int menu_left_right_start_cy = static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * (1.75 / 2)));
 
-        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Up", "",
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Up", L"",
             menu_up_down_cx,
             menu_up_cy,
             kMenuNavButtonWidth, kMenuNavButtonHeight, true, OverlayButtonType::MENU, player });
-        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Down", "",
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Down", L"",
             menu_up_down_cx,
             static_cast<int>(menu_up_cy + (kMenuNavButtonHeight * 1.75)),
             kMenuNavButtonWidth, kMenuNavButtonHeight, true, OverlayButtonType::MENU, player });
-        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Left", "",
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Left", L"",
             menu_up_down_cx - kMenuNavButtonWidth + 5,
             menu_left_right_start_cy,
             kMenuNavButtonWidth, kMenuNavButtonHeight, true, OverlayButtonType::MENU, player });
-        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Right", "",
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Menu Right", L"",
             menu_up_down_cx + kMenuNavButtonWidth - 5,
             menu_left_right_start_cy,
             kMenuNavButtonWidth, kMenuNavButtonHeight, true, OverlayButtonType::MENU, player });
-        touch_overlay_buttons.push_back({ button_index++, player_str + "Start", "",
+        touch_overlay_buttons.push_back({ button_index++, player_str + "Start", L"",
             menu_up_down_cx + static_cast<int>(kMenuNavButtonWidth * 3.25),
             menu_left_right_start_cy,
             kMenuNavButtonWidth, kMenuNavButtonHeight, false, OverlayButtonType::MENU, player });
@@ -134,11 +158,11 @@ void SetupOverlayButtons() {
             { "Keypad 1", "Keypad 2", "Keypad 3" },
             { "Keypad 0", "Keypad 00", "Keypad Decimal" }
         };
-        static string pinpad_key_labels[4][3] = {
-            { "7", "8", "9" },
-            { "4", "5", "6" },
-            { "1", "2", "3" },
-            { "0", "00", "" }
+        static wstring pinpad_key_labels[4][3] = {
+            { L"7", L"8", L"9" },
+            { L"4", L"5", L"6" },
+            { L"1", L"2", L"3" },
+            { L"0", L"00", L"" }
         };
         // 20 pixels from either edge of the screen to the edge of the overlay elements
         static constexpr int pinpad_edge_to_screen = 20;
@@ -175,7 +199,7 @@ void SetupOverlayButtons() {
             }
         }
 
-        // Setup the show/hide overlay button
+        // Setup the toggle overlay button
         static const int edge_to_vis_center = pinpad_edge_to_screen + (kUtilityButtonWidth / 2);
         static constexpr int overlay_vis_cxs[2] = {
             edge_to_vis_center,
@@ -183,7 +207,7 @@ void SetupOverlayButtons() {
         };
         static constexpr int overlay_vis_cy = pinpad_edge_to_screen + (kUtilityButtonHeight / 2);
 
-        touch_overlay_buttons.push_back({ button_index++, "", "",
+        touch_overlay_buttons.push_back({ button_index++, "", L"Toggle Overlay",
             overlay_vis_cxs[player],
             overlay_vis_cy,
             kUtilityButtonWidth, kUtilityButtonHeight, false, OverlayButtonType::VISIBILITY, player });
@@ -197,7 +221,7 @@ void SetupOverlayButtons() {
         static constexpr int card_in_cy = pinpad_edge_to_screen + (kUtilityButtonHeight / 2);
 
         if (card_ids[player] != "") {
-            touch_overlay_buttons.push_back({ button_index++, "", "",
+            touch_overlay_buttons.push_back({ button_index++, "", L"Insert Card",
                 card_in_cxs[player],
                 card_in_cy,
                 kUtilityButtonWidth, kUtilityButtonHeight, false, OverlayButtonType::CARD_IN, player });
@@ -226,7 +250,7 @@ void RenderTouchOverlay() {
     // Draw pressed state over buttons that are pressed
     for (OverlayButton& button : touch_overlay_buttons) {
         if (touch_overlay_button_states[button.id_]) {
-            DrawSingleButton(button, render_target, brush_pressed);
+            DrawSingleButton(button, render_target, true);
         }
     }
 
@@ -235,14 +259,18 @@ void RenderTouchOverlay() {
 
 // Dispose of the cached D2D objects and free up memory from brushes, render targets, etc.
 void CleanupTouchOverlay() {
-    if (brush_normal != nullptr) brush_normal->Release();
-    if (brush_pressed != nullptr) brush_pressed->Release();
+    if (brush_menu_fill != nullptr) brush_menu_fill->Release();
+    if (brush_pinpad_fill != nullptr) brush_pinpad_fill->Release();
+    if (brush_button_outline_normal != nullptr) brush_button_outline_normal->Release();
+    if (brush_button_outline_pressed != nullptr) brush_button_outline_pressed->Release();
     if (cached_render_targets[0][0] != nullptr) cached_render_targets[0][0]->Release();
     if (cached_render_targets[0][1] != nullptr) cached_render_targets[0][1]->Release();
     if (cached_render_targets[1][0] != nullptr) cached_render_targets[1][0]->Release();
     if (cached_render_targets[1][1] != nullptr) cached_render_targets[1][1]->Release();
     if (render_target != nullptr) render_target->Release();
     if (d2d_factory != nullptr) d2d_factory->Release();
+    if (d2d_write_factory != nullptr) d2d_write_factory->Release();
+    if (d2d_text_format != nullptr) d2d_text_format->Release();
 
     // Release our cached button geometries
     for (OverlayButton& button: touch_overlay_buttons) {
@@ -335,7 +363,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
 
 // Draws a single button on the touch overlay, using the given render target and the given brush,
 // so this can be re-used for the cached base layer as well as the top layer render target.
-void DrawSingleButton(OverlayButton& button, ID2D1RenderTarget* render_target, ID2D1SolidColorBrush* brush) {
+void DrawSingleButton(OverlayButton& button, ID2D1RenderTarget* render_target, bool is_pressed) {
     if (button_geometries.count(button.id_) == 0) {
         // Create a rectangle geometry if we don't have one cached for this button
         int half_width = (button.width_ / 2);
@@ -366,8 +394,34 @@ void DrawSingleButton(OverlayButton& button, ID2D1RenderTarget* render_target, I
         button_geometries[button.id_] = transformed_geometry;
     }
 
-    // Pull the cached geometry for this button and fill it
-    render_target->FillGeometry(button_geometries[button.id_], brush);
+    // Pull the cached geometry for this button and draw it in its given state
+    render_target->FillGeometry(
+        button_geometries[button.id_],
+        button.type_ == OverlayButtonType::MENU ? brush_menu_fill : brush_pinpad_fill
+    );
+    render_target->DrawGeometry(
+        button_geometries[button.id_],
+        is_pressed ? brush_button_outline_pressed : brush_button_outline_normal,
+        2.0f
+    );
+
+    // Draw the button label, if it has one
+    if (button.label_ != L"") {
+        int half_width = button.width_ / 2;
+        int half_height = button.height_ / 2;
+        float left = button.center_x_ - half_width;
+        float right = button.center_x_ + half_width;
+        float top = button.center_y_ - half_height;
+        float bottom = button.center_y_ + half_height;
+
+        render_target->DrawText(
+            button.label_.c_str(),
+            static_cast<UINT32>(button.label_.length()),
+            d2d_text_format,
+            D2D1::RectF(left, top, right, bottom),
+            brush_menu_fill
+        );
+    }
 }
 
 // Draw the static button backgrounds and default visual states to the cached render target
@@ -380,18 +434,18 @@ void DrawButtonsToCaches() {
     for (OverlayButton& button : touch_overlay_buttons) {
         if (button.type_ == OverlayButtonType::VISIBILITY) {
             // Draw the visibility button on all render targets
-            DrawSingleButton(button, cached_render_targets[0][0], brush_normal);
-            DrawSingleButton(button, cached_render_targets[0][1], brush_normal);
-            DrawSingleButton(button, cached_render_targets[1][0], brush_normal);
-            DrawSingleButton(button, cached_render_targets[1][1], brush_normal);
+            DrawSingleButton(button, cached_render_targets[0][0], false);
+            DrawSingleButton(button, cached_render_targets[0][1], false);
+            DrawSingleButton(button, cached_render_targets[1][0], false);
+            DrawSingleButton(button, cached_render_targets[1][1], false);
         } else if (button.player_ == 0) {
             // Draw player 1 buttons on the visible player 1 targets
-            DrawSingleButton(button, cached_render_targets[1][0], brush_normal);
-            DrawSingleButton(button, cached_render_targets[1][1], brush_normal);
+            DrawSingleButton(button, cached_render_targets[1][0], false);
+            DrawSingleButton(button, cached_render_targets[1][1], false);
         } else if (button.player_ == 1) {
             // Draw player 2 buttons on the visible player 2 targets
-            DrawSingleButton(button, cached_render_targets[0][1], brush_normal);
-            DrawSingleButton(button, cached_render_targets[1][1], brush_normal);
+            DrawSingleButton(button, cached_render_targets[0][1], false);
+            DrawSingleButton(button, cached_render_targets[1][1], false);
         }
     }
 

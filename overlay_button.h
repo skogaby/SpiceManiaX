@@ -19,7 +19,7 @@ struct OverlayButton {
 	std::string input_name_;
 	// Optional label for the button (menu nav buttons won't use this). If we shouldn't
 	// draw a label, just set this to ""
-	std::string label_;
+	std::wstring label_;
 	// The X coordinate of the center of the button
 	int center_x_;
 	// The Y coordinate of the width of the button
