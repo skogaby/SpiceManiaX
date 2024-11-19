@@ -75,3 +75,17 @@ void InputUtils::PerformPinpadInputTasks(Connection& con) {
         keypads_set(con, player, keys[player]);
     }
 }
+
+// Function for sending card-in events to SpiceAPI
+void InputUtils::PerformLoginInputTasks(Connection& con) {
+    // See if the card-in buttons are being pressed
+    for (OverlayButton& button : touch_overlay_buttons) {
+        if (button.type_ == OverlayButtonType::CARD_IN &&
+            touch_overlay_button_states[button.id_]
+        ) {
+            // Handle card-in for this player
+            card_insert(con, button.player_, card_ids[button.player_].c_str());
+        }
+    }
+}
+

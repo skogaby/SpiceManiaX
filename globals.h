@@ -15,3 +15,5 @@ extern std::vector<OverlayButton> touch_overlay_buttons;
 extern std::map<int, bool> touch_overlay_button_states;
 // Says whether the overlay is currently being shown or not for each player
 extern bool is_overlay_visible[2];
+// The card IDs to use for each player, if available
+extern std::string card_ids[2];

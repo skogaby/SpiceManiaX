@@ -87,10 +87,8 @@ void InitializeTouchOverlay() {
         touch_overlay_button_states[button.id_] = false;
     }
 
-    // Draw static content (buttons in normal state) to the off-screen render target
-    // cache_render_target_visible->BeginDraw();
+    // Draw static content (buttons in normal state) to the off-screen render targets
     DrawButtonsToCaches();
-    // cache_render_target_visible->EndDraw();
 }
 
 // Sets up the overlay button objects for both players
@@ -100,8 +98,6 @@ void SetupOverlayButtons() {
         string player_str = "P" + to_string(player + 1) + " ";
         int button_index = (player * 100);
 
-        // 30 pixels from the edge of the screen to the center of the nearest menu button
-        static constexpr int menu_edge_to_screen = 30;
         // Define the menu navigation buttons. All the coordinates are defined pretty jankily, but it is what it is. Everything
         // is anchored from the position of the Menu Up button for each player.
         static constexpr int menu_up_cxs[2] = { 100, 1072 };
@@ -180,9 +176,10 @@ void SetupOverlayButtons() {
         }
 
         // Setup the show/hide overlay button
+        static const int edge_to_vis_center = pinpad_edge_to_screen + (kUtilityButtonWidth / 2);
         static constexpr int overlay_vis_cxs[2] = {
-            pinpad_edge_to_screen + (kUtilityButtonWidth / 2),
-            kWindowRenderWidth - pinpad_edge_to_screen - (kUtilityButtonWidth / 2)
+            edge_to_vis_center,
+            kWindowRenderWidth - edge_to_vis_center
         };
         static constexpr int overlay_vis_cy = pinpad_edge_to_screen + (kUtilityButtonHeight / 2);
 
@@ -190,6 +187,21 @@ void SetupOverlayButtons() {
             overlay_vis_cxs[player],
             overlay_vis_cy,
             kUtilityButtonWidth, kUtilityButtonHeight, false, OverlayButtonType::VISIBILITY, player });
+
+        // Setup the card-in button if a card ID is configured for this player
+        static const int edge_to_card_center = pinpad_edge_to_screen + (kUtilityButtonWidth * 1.5) + pinpad_spacing;
+        static constexpr int card_in_cxs[2] = {
+            edge_to_card_center,
+            kWindowRenderWidth - edge_to_card_center
+        };
+        static constexpr int card_in_cy = pinpad_edge_to_screen + (kUtilityButtonHeight / 2);
+
+        if (card_ids[player] != "") {
+            touch_overlay_buttons.push_back({ button_index++, "", "",
+                card_in_cxs[player],
+                card_in_cy,
+                kUtilityButtonWidth, kUtilityButtonHeight, false, OverlayButtonType::CARD_IN, player });
+        }
     }
 }
 

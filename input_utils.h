@@ -29,6 +29,7 @@ public:
     static void SMXStateChangedCallback(int pad, SMXUpdateCallbackReason reason, void* pUser);
     void PerformMainInputTasks(Connection& con);
     void PerformPinpadInputTasks(Connection& con);
+    void PerformLoginInputTasks(Connection& con);
 
 private:
     void SmxOnStateChanged(int pad);

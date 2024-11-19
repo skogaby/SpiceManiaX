@@ -23,7 +23,12 @@
 using namespace spiceapi;
 using namespace std;
 
+// Commandline argument keys
+const string kP1CardArg = "p1card";
+const string kP2CardArg = "p2card";
+
 // Forward function declarations
+void ParseArgs();
 void InitializeTimers();
 void CleanupTimers();
 void SmxOnLog(const char* log);
@@ -60,6 +65,9 @@ static UINT window_position_timer_id;
 
 // Program entrypoint
 int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
+    // Parse the CLI arguments
+    ParseArgs();
+
     // Create a console window we can use for logging
     if (AllocConsole()) {
         FILE* fp;
@@ -116,6 +124,61 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
     return 0;
 }
 
+// Parses the command-line arguments
+void ParseArgs() {
+    map<string, string> args_map;
+
+    // Use GetCommandLineW to get the full command-line as a wide string
+    int argc;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+
+    if (argv == NULL) {
+        return;
+    }
+
+    // Iterate the arguments (skip argument 0, the program name)
+    for (int i = 1; i < argc; i++) {
+        wstring arg = argv[i];
+
+        // Check if the argument is a key
+        if (arg[0] == L'-') {
+            // Remove one or two dashes
+            string key = (arg[1] == L'-') ? string(arg.begin() + 2, arg.end())
+                : string(arg.begin() + 1, arg.end());
+
+            // Look for the value (next argument)
+            if (i + 1 < argc) {
+                wstring value = argv[i + 1];
+
+                // If the next argument is not a key, treat it as the value
+                if (value[0] != L'-') {
+                    args_map[key] = string(value.begin(), value.end());
+                    // Skip the value in the next iteration
+                    ++i; 
+                } else {
+                    // Handle case where value is missing
+                    args_map[key] = ""; 
+                }
+            } else {
+                // Handle case where value is missing
+                args_map[key] = "";
+            }
+        }
+    }
+
+    // Free the memory allocated by CommandLineToArgvW
+    LocalFree(argv);
+
+    // Set the global variables
+    if (args_map.count(kP1CardArg) > 0) {
+        card_ids[0] = args_map[kP1CardArg];
+    }
+
+    if (args_map.count(kP2CardArg) > 0) {
+        card_ids[1] = args_map[kP2CardArg];
+    }
+}
+
 // Initialize all of our system timers for various IO tasks
 void InitializeTimers() {
     // Set system media timer resolution to 1 ms, so we can have accurate timers for inputs and outputs
@@ -162,6 +225,7 @@ void WaitForConnection() {
 void CALLBACK ThirtyHzTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
     lights_util.PerformLightsTasks(con);
     input_utils.PerformPinpadInputTasks(con);
+    input_utils.PerformLoginInputTasks(con);
     InvalidateRect(hwnd, NULL, FALSE);
 }
 
