@@ -35,11 +35,20 @@ void InputUtils::PerformMainInputTasks(Connection& con) {
 
     // Get the touch overlay input values
     for (OverlayButton& button : touch_overlay_buttons) {
+        bool is_pressed = touch_overlay_button_states[button.id_];
+
         if (button.type_ == OverlayButtonType::MENU) {
             ButtonState state;
             state.name = button.input_name_;
-            state.value = (float)touch_overlay_button_states[button.id_];
+            state.value = (float) is_pressed;
             button_states.push_back(state);
+        } else if (button.type_ == OverlayButtonType::VISIBILITY) {
+            if (!is_toggle_pressed[button.player_] && is_pressed) {
+                // Toggle the visibility of the overlay for this player
+                is_overlay_visible[button.player_] = !is_overlay_visible[button.player_];
+            }
+
+            is_toggle_pressed[button.player_] = is_pressed;
         }
     }
 

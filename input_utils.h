@@ -36,6 +36,8 @@ private:
 
     // Buffer to hold our input states
     array<uint16_t, 2> pad_input_states_;
+    // Keep track of the state of the button to toggle overlay visibility
+    bool is_toggle_pressed[2];
 
     // The input names that SpiceAPI expects for each panel
     static const string kStageInputNames[2][4];

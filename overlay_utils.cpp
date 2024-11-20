@@ -288,13 +288,6 @@ void HandleWindowPress(int x, int y, bool pressed) {
     for (OverlayButton& button : touch_overlay_buttons) {
         if (IsTouchInside(button, touchPoint)) {
             touch_overlay_button_states[button.id_] = pressed;
-
-            // If we were pressing an overlay visibility button, toggle
-            // the overlay's visibility status.
-            if (pressed && button.type_ == OverlayButtonType::VISIBILITY) {
-                is_overlay_visible[button.player_] = !is_overlay_visible[button.player_];
-            }
-
             return;
         }
     }
