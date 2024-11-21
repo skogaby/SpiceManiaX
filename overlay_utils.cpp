@@ -32,7 +32,7 @@ void CreateOverlayWindow(HINSTANCE hInstance, int nCmdShow) {
     RegisterClass(&wc);
 
     hwnd = CreateWindowEx(
-        WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_APPWINDOW,
+        WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE,
         wc.lpszClassName,
         L"SpiceManiaX Overlay",
         WS_POPUP | WS_VISIBLE,
@@ -328,8 +328,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
                 // Determine if this was a press or not
                 if (touches[i].dwFlags & TOUCHEVENTF_DOWN) {
                     HandleWindowPress(x, y, true);
-                }
-                else if (touches[i].dwFlags & TOUCHEVENTF_UP) {
+                } else if (touches[i].dwFlags & TOUCHEVENTF_UP) {
                     HandleWindowPress(x, y, false);
                 }
             }
@@ -345,6 +344,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
         // Exit the program if the user presses Escape
         if (w_param == VK_ESCAPE) {
             PostQuitMessage(0);
+        }
+        break;
+    case WM_ACTIVATE:
+        if (w_param != WA_INACTIVE) {
+            return 0;
         }
         break;
     default:
@@ -425,18 +429,14 @@ void DrawButtonsToCaches() {
 
     // Draw static button backgrounds to the off-screen render target
     for (OverlayButton& button : touch_overlay_buttons) {
-        if (button.type_ == OverlayButtonType::VISIBILITY) {
-            // Draw the visibility button on all render targets
-            DrawSingleButton(button, cached_render_targets[0][0], false);
-            DrawSingleButton(button, cached_render_targets[0][1], false);
+        // Draw each player's buttons to both of their own render targets, and the toggle overlay
+        // buttons should be drawn to both player's render targets regardless
+        if (button.player_ == 0 || button.type_ == OverlayButtonType::VISIBILITY) {
             DrawSingleButton(button, cached_render_targets[1][0], false);
             DrawSingleButton(button, cached_render_targets[1][1], false);
-        } else if (button.player_ == 0) {
-            // Draw player 1 buttons on the visible player 1 targets
-            DrawSingleButton(button, cached_render_targets[1][0], false);
-            DrawSingleButton(button, cached_render_targets[1][1], false);
-        } else if (button.player_ == 1) {
-            // Draw player 2 buttons on the visible player 2 targets
+        }
+        
+        if (button.player_ == 1 || button.type_ == OverlayButtonType::VISIBILITY) {
             DrawSingleButton(button, cached_render_targets[0][1], false);
             DrawSingleButton(button, cached_render_targets[1][1], false);
         }

@@ -96,6 +96,11 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
     WaitForConnection();
 
     printf("Connected to SpiceAPI successfully\n");
+    printf("Creating overlay window in 10 seconds...\n");
+
+    Sleep(10000);
+
+    printf("Creating overlay window\n");
 
     // Create the actual overlay window and initialize Direct2D drawing
     CreateOverlayWindow(h_instance, cmd_show);
@@ -250,5 +255,5 @@ void CALLBACK ConnectivityCheckTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, D
 
 // Callback for the timer which triggers the window to reposition itself on top of everything else
 void CALLBACK WindowPosTimerCallback(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR) {
-    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kWindowRenderWidth, kWindowRenderHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE);
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, kWindowRenderWidth, kWindowRenderHeight, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }

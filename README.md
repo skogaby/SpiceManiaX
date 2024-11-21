@@ -4,9 +4,14 @@ A spicy companion for running Dance Dance Revolution on a StepManiaX Dedicated C
 
 ## What is it?
 
-This is a standalone application which allows a user of spice2x to emulate the cabinet lights from a DDR 20th Anniverary Gold Cabinet directly on a StepManiaX Dedicated Cabinet. This includes fully addressable RGB lighting on the cabinet and marquee, full RGB control of the pad lighting (though DDR sticks to red/blue by default), support for the pad corner lights, etc. without having to manually map the lights via `spicecfg`, as well as getting the entirety of each LED strip, rather than just the average color of each strip.
+This is a standalone application which allows a user of `spice2x` playing Dance Dance Revolution on a StepManiaX Dedicated Cabinet to have the following features:
 
-This is accomplished by querying spice2x via `SpiceAPI` to gather the lights data, then using a custom fork of the StepManiaX SDK to output the lights to the cabinet.
+* Full stage and cabinet lighting support, including fully addressable RGB lighting on both
+* Full support for stage inputs, with 1000Hz polling
+* A touchscreen overlay with menu navigation buttons, a pinpad, and a button to scan a virtual card for each player
+* Automatic input and output mapping, without needing to use `spicecfg` (apart from the `test` and `service` buttons)
+
+This is accomplished by querying `spice2x` via `SpiceAPI` to gather the lights data, then using a custom fork of the StepManiaX SDK to output the lights to the cabinet. `SpiceAPI` is also used for sending stage and touchscreen inputs to the game.
 
 NOTE: The speaker and subwoofer lights on a StepManiaX Cabinet are not software controllable, and remain statically always on. Therefore, the lights mapping is as follows:
 
@@ -16,12 +21,14 @@ NOTE: The speaker and subwoofer lights on a StepManiaX Cabinet are not software 
 * DDR Stage Corner Lights -> SMX Stage Corners (in an L-shape)
 * DDR Stage Panels -> SMX Stage Panels
 
+The only buttons or lights you should need to map in `spicecfg` are the test and service buttons. These should be mappable out of the box in `spicecfg`, however.
+
 ## How do I use it?
 
 ### Pre-requisites
 
-* A version of spice2x which exposes the DDR Gold Cabinet lights via `SpiceAPI`. As of this writing, this is the `2024-10-29` beta, or anything newer.
-* 64-bit DDR + 64-bit spice2x, with hex edits if necessary, to force it into Gold Cabinet mode (32-bit DDR does not have the right codepaths to emulate the BIO2 lights that the Gold Cab uses).
+* A version of `spice2x` which exposes the DDR Gold Cabinet lights via `SpiceAPI`. This should be anything including or after the `2024-10-29` stable release.
+* 64-bit Dance Dance Revolution + 64-bit `spice2x`, with hex edits if necessary, to force it into Gold Cabinet mode (32-bit DDR does not have the right codepaths to emulate the BIO2 lights that the Gold Cab uses).
   * If you wish to play 32-bit DDR using White Cab lights, `spice2x` has an option called `smxdedicab` which allows you to map the lights via `spicecfg`. However, you can't use this method for getting the full RGB lights from a Gold Cabinet. You do not need `SpiceManiaX` for that approach, though.
 * A copy of `SpiceManiaX` plus the corresponding `SMX.dll` needed to interact with the cabinet lights.
 
@@ -52,7 +59,7 @@ START /AFFINITY 2 /HIGH spice64.exe -api 1337 -apipass spicemaniax
 2. Can I emulate a cabinet other than Gold cabinets with this?
 * No, this is explicitly meant for doing Gold Cabinet lights on SMX hardware. If you wish to emulate other cabinet lights, use the `smxdedicab` option in Spice2x, and map the lights via `spicecfg`. This tool exists to get around the limitations in mapping large amounts of RGB lights / tape LEDs in `spicecfg`.
 3. Does this support inputs, or only lights?
-* This only supports lights, at the moment. This allows the tool to be a lot looser with timing requirements, and you should have fine results mapping the inputs via `spicecfg` directly.
+* This tool supports both inputs and lights!
 4. Can I re-map the lighting configuration?
 * No. If you wish to change the lights, that's all hardcoded right now.
 5. Can I run this directly on a StepManiaX Android PC?
