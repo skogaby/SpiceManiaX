@@ -429,14 +429,18 @@ void DrawButtonsToCaches() {
 
     // Draw static button backgrounds to the off-screen render target
     for (OverlayButton& button : touch_overlay_buttons) {
+
         // Draw each player's buttons to both of their own render targets, and the toggle overlay
         // buttons should be drawn to both player's render targets regardless
-        if (button.player_ == 0 || button.type_ == OverlayButtonType::VISIBILITY) {
+        if (button.type_ == OverlayButtonType::VISIBILITY) {
+            DrawSingleButton(button, cached_render_targets[0][0], false);
+            DrawSingleButton(button, cached_render_targets[0][1], false);
             DrawSingleButton(button, cached_render_targets[1][0], false);
             DrawSingleButton(button, cached_render_targets[1][1], false);
-        }
-        
-        if (button.player_ == 1 || button.type_ == OverlayButtonType::VISIBILITY) {
+        } else if (button.player_ == 0) {
+            DrawSingleButton(button, cached_render_targets[1][0], false);
+            DrawSingleButton(button, cached_render_targets[1][1], false);
+        } else if (button.player_ == 1) {
             DrawSingleButton(button, cached_render_targets[0][1], false);
             DrawSingleButton(button, cached_render_targets[1][1], false);
         }
