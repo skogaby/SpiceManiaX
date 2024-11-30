@@ -9,7 +9,7 @@ std::vector<OverlayButton> touch_overlay_buttons;
 // Mapping of button IDs to button press states
 std::map<int, bool> touch_overlay_button_states;
 // Says whether the overlay is currently being shown or not for each player
-bool is_overlay_visible[2] = { true, true };
+bool is_overlay_visible[2] = { false, false };
 // The card IDs to use for each player, if available
 std::string card_ids[2] = { "", "" };
 // The opacity value to use for the overlay, between 0.0 and 1.0
